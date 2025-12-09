@@ -2,6 +2,11 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
+import PhoebiLogo from "../assets/Phoebi.png";
+import CreativeImg from "../assets/Creative_Challenge.png";
+import MaterialImg from "../assets/Material_Challenge.png";
+import StoryImg from "../assets/Story_Challenge.png";
+
 export const ChallengeIntroPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -21,19 +26,14 @@ export const ChallengeIntroPage: React.FC = () => {
 
       {/* Top bar */}
       <header className="w-full bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto flex items-center justify-between px-4 md:px-10 py-4 md:py-5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between px-4 md:px-10 py-4 md:py-5">
           <div className="flex items-center gap-3 md:gap-4">
-            {/* Logo placeholder */}
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#F5C437] flex items-center justify-center">
-                {/* Replace this with your logo image/icon */}
-                <span className="text-2xl" role="img" aria-label="Phoebi logo">
-                  🌞
-                </span>
-              </div>
-              <span className="text-2xl md:text-3xl font-extrabold tracking-wide text-[#F2A900]">
-                Phoebi
-              </span>
+            <div className="flex items-center">
+              <img
+                src={PhoebiLogo}
+                alt="Phoebi Logo"
+                className="max-h-16 md:max-h-20 lg:max-h-24 w-auto object-contain drop-shadow"
+              />
             </div>
           </div>
 
@@ -42,7 +42,6 @@ export const ChallengeIntroPage: React.FC = () => {
             aria-label="Settings"
             className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition"
           >
-            {/* You can replace this with an actual icon component */}
             <span className="text-xl">⚙️</span>
           </button>
         </div>
@@ -50,24 +49,52 @@ export const ChallengeIntroPage: React.FC = () => {
 
       {/* Main content */}
       <main className="flex-1 w-full">
-        <div className="max-w-6xl mx-auto px-4 md:px-10 py-8 md:py-12">
+        <div className="max-w-7xl mx-auto px-4 md:px-12 py-10 md:py-16">
           {/* Challenge cards */}
-          <section>
-            <div className="flex flex-col md:flex-row justify-center items-stretch gap-8 md:gap-10">
+          <section className="mt-4 md:mt-6">
+            <div
+              className="
+                flex flex-col items-center
+                gap-8 md:gap-10
+                lg:flex-row lg:items-stretch lg:justify-center
+              "
+            >
               {/* Creative Challenge */}
               <button
                 type="button"
                 onClick={handleCreativeClick}
-                className="group w-full md:w-64 xl:w-72 rounded-[32px] bg-[#F1C423] shadow-[0_18px_40px_rgba(0,0,0,0.18)] flex flex-col items-center pt-6 pb-7 hover:translate-y-1 hover:shadow-[0_22px_45px_rgba(0,0,0,0.22)] transition-transform"
+                className="
+                  group
+                  w-full max-w-sm
+                  lg:w-80
+                  rounded-[36px]
+                  bg-[#F1C423]
+                  shadow-[0_20px_40px_rgba(0,0,0,0.18)]
+                  flex flex-col items-center
+                  pt-8 pb-8
+                  hover:translate-y-1 hover:shadow-[0_24px_50px_rgba(0,0,0,0.22)]
+                  transition-transform
+                "
               >
-                <div className="w-48 max-w-[80%] aspect-square rounded-[24px] bg-[#FFEFD8] flex items-center justify-center overflow-hidden">
-                  {/* Placeholder for creative image */}
-                  <span className="text-5xl" role="img" aria-label="Creative">
-                    🎨
-                  </span>
-                  {/* Replace with <img src={...} alt="Creative challenge" className="w-full h-full object-cover" /> */}
+                <div className="w-full px-6">
+                  <div
+                    className="
+                      w-full
+                      aspect-square
+                      rounded-[28px]
+                      bg-[#FFEFD8]
+                      flex items-center justify-center
+                      overflow-hidden
+                    "
+                  >
+                    <img
+                      src={CreativeImg}
+                      alt="Creative Challenge"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
                 </div>
-                <div className="mt-4 text-center text-white font-extrabold text-lg md:text-xl leading-tight tracking-wide">
+                <div className="mt-5 text-center text-white font-extrabold text-xl md:text-2xl leading-tight tracking-wide">
                   Creative
                   <br />
                   Challenge
@@ -75,15 +102,28 @@ export const ChallengeIntroPage: React.FC = () => {
               </button>
 
               {/* Material Challenge */}
-              <div className="w-full md:w-64 xl:w-72 rounded-[32px] bg-[#4CBC93] shadow-[0_18px_40px_rgba(0,0,0,0.18)] flex flex-col items-center pt-6 pb-7 opacity-90">
-                <div className="w-48 max-w-[80%] aspect-square rounded-[24px] bg-[#E3FFF2] flex items-center justify-center overflow-hidden">
-                  {/* Placeholder for material image */}
-                  <span className="text-5xl" role="img" aria-label="Material">
-                    🧱
-                  </span>
-                  {/* Replace with <img src={...} alt="Material challenge" className="w-full h-full object-cover" /> */}
+              <div
+                className="
+                  w-full max-w-sm
+                  lg:w-80
+                  rounded-[36px]
+                  bg-[#4CBC93]
+                  shadow-[0_20px_40px_rgba(0,0,0,0.18)]
+                  flex flex-col items-center
+                  pt-8 pb-8
+                  opacity-90
+                "
+              >
+                <div className="w-full px-6">
+                  <div className="w-full aspect-square rounded-[28px] bg-[#E3FFF2] flex items-center justify-center overflow-hidden">
+                    <img
+                      src={MaterialImg}
+                      alt="Material Challenge"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
                 </div>
-                <div className="mt-4 text-center text-white font-extrabold text-lg md:text-xl leading-tight tracking-wide">
+                <div className="mt-5 text-center text-white font-extrabold text-xl md:text-2xl leading-tight tracking-wide">
                   Material
                   <br />
                   Challenge
@@ -91,15 +131,28 @@ export const ChallengeIntroPage: React.FC = () => {
               </div>
 
               {/* Story Challenge */}
-              <div className="w-full md:w-64 xl:w-72 rounded-[32px] bg-[#5B4EE6] shadow-[0_18px_40px_rgba(0,0,0,0.18)] flex flex-col items-center pt-6 pb-7 opacity-90">
-                <div className="w-48 max-w-[80%] aspect-square rounded-[24px] bg-[#EDE8FF] flex items-center justify-center overflow-hidden">
-                  {/* Placeholder for story image */}
-                  <span className="text-5xl" role="img" aria-label="Story">
-                    📖
-                  </span>
-                  {/* Replace with <img src={...} alt="Story challenge" className="w-full h-full object-cover" /> */}
+              <div
+                className="
+                  w-full max-w-sm
+                  lg:w-80
+                  rounded-[36px]
+                  bg-[#5B4EE6]
+                  shadow-[0_20px_40px_rgba(0,0,0,0.18)]
+                  flex flex-col items-center
+                  pt-8 pb-8
+                  opacity-90
+                "
+              >
+                <div className="w-full px-6">
+                  <div className="w-full aspect-square rounded-[28px] bg-[#EDE8FF] flex items-center justify-center overflow-hidden">
+                    <img
+                      src={StoryImg}
+                      alt="Story Challenge"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
                 </div>
-                <div className="mt-4 text-center text-white font-extrabold text-lg md:text-xl leading-tight tracking-wide">
+                <div className="mt-5 text-center text-white font-extrabold text-xl md:text-2xl leading-tight tracking-wide">
                   Story
                   <br />
                   Challenge
@@ -109,7 +162,7 @@ export const ChallengeIntroPage: React.FC = () => {
           </section>
 
           {/* History */}
-          <section className="mt-10 md:mt-12">
+          <section className="mt-12 md:mt-14">
             <h2 className="text-xl md:text-2xl font-extrabold text-[#D79B3A] mb-4">
               History
             </h2>
@@ -133,7 +186,6 @@ export const ChallengeIntroPage: React.FC = () => {
               <div className="flex items-center justify-start sm:justify-end gap-2 sm:gap-3">
                 <span className="text-sm sm:text-base">Score</span>
                 <span className="font-bold text-lg sm:text-xl">9.2</span>
-                {/* Medal placeholder */}
                 <span className="text-2xl" role="img" aria-label="Medal">
                   🏅
                 </span>
