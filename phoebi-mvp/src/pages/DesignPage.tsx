@@ -5,15 +5,18 @@ import { useDesign } from "../state/DesignContext";
 import { COMPONENTS } from "../data/components";
 import { MATERIALS } from "../data/materials";
 import type {
-    ComponentId,
-    MaterialId,
-    ScoreResult,
+  ComponentId,
+  MaterialId,
+  ScoreResult,
 } from "../types/domain";
 import { getHint } from "../logic/hints";
+import { LearningSpace } from "./LearningSpace";
 
 export const DesignPage: React.FC = () => {
   const navigate = useNavigate();
   const { design, score, setMaterial } = useDesign();
+
+  const [activeTab, setActiveTab] = useState<'components' | 'materials'>('components');
 
   const [activeComponent, setActiveComponent] =
     useState<ComponentId>("frame");
@@ -40,8 +43,13 @@ export const DesignPage: React.FC = () => {
     score.overallScore >= 80
       ? "text-green-600"
       : score.overallScore >= 50
-      ? "text-yellow-600"
-      : "text-red-600";
+        ? "text-yellow-600"
+        : "text-red-600";
+
+  const onComponentClick = (componentId: ComponentId) => {
+    setActiveComponent(componentId);
+    console.log(componentId + "Has been click")
+  }
 
   return (
     <div className="min-h-screen bg-[#FFF7C9] flex flex-col">
@@ -58,132 +66,158 @@ export const DesignPage: React.FC = () => {
             Model Bicycle – Creative Challenge
           </span>
         </div>
-        <button
-          className="px-4 py-2 rounded-xl bg-[#4CBC93] text-white text-sm font-semibold hover:bg-[#3ba37b]"
-          onClick={() => navigate("/summary")}
-        >
-          Finish &amp; See Summary
-        </button>
+        <div className="flex  flex-row gap-8">
+          <button
+            className="px-4 py-2 rounded-xl bg-[#4CBC93] text-white text-sm font-semibold hover:bg-[#3ba37b]"
+            onClick={() => navigate("/summary")}
+          >
+            Create Blueprint
+          </button>
+          <button
+            className="px-4 py-2 rounded-xl bg-[#4CBC93] text-white text-sm font-semibold hover:bg-[#3ba37b]"
+            onClick={() => navigate("/summary")}
+          >
+            AR mode
+          </button>
+        </div>
       </header>
 
       {/* Main */}
-      <main className="flex-1 px-8 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left: components */}
-          <div>
-            <h2 className="text-lg font-semibold text-[#D79B3A] mb-3">
-              1. Choose a part
-            </h2>
-            <div className="flex flex-col gap-3">
-              {COMPONENTS.map((comp) => {
-                const isActive = comp.id === activeComponent;
-                return (
-                  <button
-                    key={comp.id}
-                    type="button"
-                    onClick={() =>
-                      setActiveComponent(comp.id as ComponentId)
-                    }
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border ${
-                      isActive
-                        ? "bg-[#F5C437] border-[#E4B52F] text-white"
-                        : "bg-white border-gray-200 text-gray-800"
-                    } shadow-sm hover:shadow-md transition-shadow`}
-                  >
-                    <span className="font-medium">{comp.name}</span>
-                    <span className="text-xs opacity-70">
-                      {design[comp.id].materialId}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Middle: materials */}
-          <div>
-            <h2 className="text-lg font-semibold text-[#D79B3A] mb-3">
-              2. Pick a material
-            </h2>
-            <p className="text-sm text-gray-600 mb-3">
-              You are editing:{" "}
-              <span className="font-semibold">
-                {activeCompDef.name}
-              </span>
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {allowedMaterials.map((mat) => {
-                const isSelected = mat.id === activeChoice.materialId;
-                return (
-                  <button
-                    key={mat.id}
-                    type="button"
-                    onClick={() =>
-                      setMaterial(activeComponent, mat.id as MaterialId)
-                    }
-                    className={`flex flex-col items-start px-4 py-3 rounded-2xl border shadow-sm hover:shadow-md transition-shadow ${
-                      isSelected
-                        ? "bg-[#4CBC93] text-white border-[#3ba37b]"
-                        : "bg-white text-gray-800 border-gray-200"
-                    }`}
-                  >
-                    <span className="font-semibold">{mat.name}</span>
-                    <span className="text-xs mt-1 opacity-80">
-                      CO₂: {mat.co2PerKg.toFixed(1)} kg/kg
-                    </span>
-                    <span className="text-xs opacity-80">
-                      ♻ {mat.recyclability}/10 · 🛡 {mat.durability}/10
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right: score + preview + hint */}
-          <div>
-            <h2 className="text-lg font-semibold text-[#D79B3A] mb-3">
-              3. See your impact
-            </h2>
-
-            {/* Score card */}
-            <div className="mb-4 rounded-3xl bg-white shadow-md px-5 py-4">
-              <p className="text-sm text-gray-600 mb-1">
-                Sustainability score
-              </p>
-              <p className={`text-4xl font-extrabold ${scoreColor}`}>
-                {score.overallScore.toFixed(1)}
-                <span className="text-lg text-gray-400"> / 100</span>
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Lower CO₂ and higher recyclability/durability give a better
-                score.
-              </p>
+      <main className="flex-1 ">
+        <div className="flex w-full h-screen bg-gray-100 gap-4 p-4">
+          {/* Left Sidebar: Components & Materials (Fixed Width) */}
+          <aside className="w-[300px] bg-[#EBEBE4] shadow-xl flex flex-col">
+            {/* Tab Navigation */}
+            <div className="flex bg-gray-200 gap-2">
+              <button
+                onClick={() => setActiveTab('components')}
+                className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'components'
+                    ? 'bg-[#98B46C] text-white' // Olive green for active tab
+                    : 'bg-[#C5C5BB] text-gray-700 hover:bg-[#B3B3AB]' // Lighter gray for inactive
+                  }`}
+              >
+                Components
+              </button>
+              <button
+                onClick={() => setActiveTab('materials')}
+                className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'materials'
+                    ? 'bg-[#98B46C] text-white'
+                    : 'bg-[#C5C5BB] text-gray-700 hover:bg-[#B3B3AB]'
+                  }`}
+              >
+                Materials
+              </button>
             </div>
 
-            {/* Tiny bike preview (very simple) */}
-            <div className="mb-4 rounded-3xl bg-white shadow-md px-5 py-4">
-              <p className="text-sm text-gray-600 mb-2">
-                Your bike (concept sketch)
-              </p>
-              <div className="flex flex-col items-center">
-                <div className="w-32 h-16 border-4 border-gray-400 rounded-3xl flex items-center justify-between px-2 mb-2">
-                  <div className="w-8 h-8 rounded-full border-4 border-gray-500" />
-                  <div className="w-8 h-8 rounded-full border-4 border-gray-500" />
+            {/* Tab Content */}
+            <div className="flex-1 p-4 overflow-y-auto">
+              {/* COMPONENTS Tab Content */}
+              {activeTab === 'components' && (
+                <div className="grid grid-cols-2 gap-3">
+                  {COMPONENTS.map((comp) => {
+                    const isActive = comp.id === activeComponent;
+                    return (
+                      <button
+                        key={comp.id}
+                        type="button"
+                        onClick={() => onComponentClick(comp.id as ComponentId)}
+                        // Styling based on the image: large square with a rounded-2xl border
+                        className={`flex flex-col items-center p-2 h-28 rounded-2xl border transition-all duration-150 ${isActive
+                            ? "ring-4 ring-[#F5C437] border-white shadow-lg bg-white" // Yellow/gold ring for active
+                            : "bg-white border-gray-200 hover:shadow-md"
+                          }`}
+                      >
+                        {/* Placeholder for the 3D Component Icon */}
+                        <div
+                          className="w-12 h-12 mb-1 rounded-lg"
+                          // Mock colors based on your component list (for visual distinction)
+                          style={{ backgroundColor: comp.id === 'frame' ? '#7A9A0F' : comp.id === 'wheel' ? '#B8B8B8' : comp.id === 'seat' ? '#F5C437' : '#5C6D9E' }}
+                        />
+                        <span className="text-xs font-medium text-gray-700">{comp.name}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="w-12 h-6 bg-gray-400 rounded-t-xl mb-1" />
-                <div className="w-24 h-2 bg-gray-500 rounded-full" />
+              )}
+
+              {activeTab === 'materials' && (
+                <div className="grid grid-cols-2 gap-3">
+                  {allowedMaterials.map((mat) => {
+                    const isSelected = mat.id === activeChoice.materialId;
+                    return (
+                      <button
+                        key={mat.id}
+                        type="button"
+                        onClick={() => setMaterial(activeComponent, mat.id as MaterialId)}
+                        className={`flex flex-col items-center p-2 h-28 rounded-2xl border transition-all duration-150 ${isSelected
+                            ? "ring-4 ring-[#4CBC93] border-white shadow-lg bg-white" 
+                            : "bg-white border-gray-200 hover:shadow-md"
+                          }`}
+                      >
+                        {/* Placeholder for the 3D Material Sphere Icon */}
+                        <div
+                          className="w-12 h-12 mb-1 rounded-full"
+                          // Mock material colors (using generic colors as a placeholder for the 3D render)
+                          style={{
+                            backgroundColor: mat.id === 'wood' ? '#8B4513' :
+                              mat.id === 'metal' ? '#A9A9A9' :
+                                mat.id === 'plastic' ? '#5D99C5' :
+                                  mat.id === 'recycled_plastic' ? '#4CBC93' : '#F5C437'
+                          }}
+                        />
+                        <span className="text-xs font-medium text-gray-700 text-center">{mat.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </aside>
+
+
+          {/* Main Area: 3D Model & Scores/Objectives */}
+          <main className="flex-1 p-6 relative bg-[#D9D9C3] overflow-hidden">
+            {/* Grid Lines Background (Mimicking the 3D grid) */}
+            <div className="absolute inset-0 z-0 opacity-40 bg-repeat" style={{
+              backgroundImage: `linear-gradient(to right, #C8C8BB 1px, transparent 1px), linear-gradient(to bottom, #C8C8BB 1px, transparent 1px)`,
+              backgroundSize: '40px 40px'
+            }}></div>
+
+            {/* Placeholder for the 3D Truck Model */}
+            <div className="relative z-10 w-full h-full flex items-center justify-center">
+              {/* Your Three.js canvas would render here. We use a placeholder for alignment. */}
+              <LearningSpace activeComponentId={activeComponent}/>
+            </div>
+
+
+            {/* Scores (Sustainability, Recyclability, Durability) - Positioned Top Left of Main Area */}
+            <div className="absolute top-8 left-8 z-20 space-y-3">
+              {/* Score Card 1: Sustainability */}
+              <div className="px-4 py-2 rounded-lg bg-white border-2 border-[#98B46C] shadow-md">
+                <span className="text-sm font-semibold text-gray-700">Sustainability Score 5/10</span>
+              </div>
+
+              {/* Score Card 2: Recyclability */}
+              <div className="px-4 py-2 rounded-lg bg-white border-2 border-[#98B46C] shadow-md">
+                <span className="text-sm font-semibold text-gray-700">Recyclability 3/10</span>
+              </div>
+
+              {/* Score Card 3: Durability */}
+              <div className="px-4 py-2 rounded-lg bg-white border-2 border-[#98B46C] shadow-md">
+                <span className="text-sm font-semibold text-gray-700">Durability 8/10</span>
               </div>
             </div>
 
-            {/* Hint bubble */}
-            <div className="rounded-3xl bg-[#FFEFD0] px-4 py-3 shadow-sm flex gap-3">
-              <div className="text-2xl">💡</div>
-              <p className="text-sm text-gray-800">
-                {hint || "Keep experimenting with materials!"}
-              </p>
+            {/* Objectives - Positioned Top Right of Main Area */}
+            <div className="absolute top-8 right-8 z-20 p-4 rounded-lg bg-white shadow-xl">
+              <h3 className="text-sm font-bold mb-2">Objectives</h3>
+              <ul className="text-sm space-y-1">
+                <li className="text-green-600">0/4 Wheels</li>
+                <li className="text-yellow-600">0/2 Doors</li>
+                <li className="text-red-600">0/2 Windows</li>
+              </ul>
             </div>
-          </div>
+          </main>
         </div>
       </main>
     </div>
