@@ -6,23 +6,32 @@ import PhoebiLogo from "../assets/Phoebi.png";
 import CreativeImg from "../assets/Creative_Challenge.png";
 import MaterialImg from "../assets/Material_Challenge.png";
 import StoryImg from "../assets/Story_Challenge.png";
+import ChallengePageBG from "../assets/ChallengePage_BG.png";
 
 export const ChallengeIntroPage: React.FC = () => {
   const navigate = useNavigate();
 
   const handleCreativeClick = () => {
-    navigate("/design");
+    navigate("/creative");
   };
 
+  const handleStoryClick = () => {
+  navigate("/story");
+};
   return (
-    <div className="min-h-screen bg-[#FFF7C9] flex flex-col relative">
-      {/* Abstract background shapes */}
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -left-24 top-40 w-[260px] h-[200px] bg-[#FCD9D0] rounded-[80px]" />
-        <div className="absolute right-[-80px] top-36 w-[260px] h-[160px] bg-[#FBBF77] rounded-[80px]" />
-        <div className="absolute right-[-40px] bottom-24 w-[260px] h-[200px] bg-[#F97373] rounded-[80px] opacity-70" />
-        <div className="absolute left-[20%] bottom-16 w-[260px] h-[180px] bg-[#C4B5FD] rounded-[80px] opacity-80" />
-      </div>
+    <div className="min-h-screen bg-[#FFF7C9] flex flex-col relative overflow-hidden">
+      {/* Background image layer */}
+      <img
+        src={ChallengePageBG}
+        alt=""
+        className="
+      pointer-events-none select-none
+      absolute inset-0 -z-10
+      w-full h-full
+      object-contain md:object-cover
+      opacity-80
+    "
+      />
 
       {/* Top bar */}
       <header className="w-full bg-white shadow-sm">
@@ -37,12 +46,12 @@ export const ChallengeIntroPage: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            aria-label="Settings"
-            className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition"
-          >
-            <span className="text-xl">⚙️</span>
+<button
+  type="button"
+  className="w-15 h-15 md:w-10 md:h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition text-4xl"
+  aria-label="Settings"
+>
+            <span className="text-4xl">⚙️</span>
           </button>
         </div>
       </header>
@@ -102,47 +111,56 @@ export const ChallengeIntroPage: React.FC = () => {
               </button>
 
               {/* Material Challenge */}
-              <div
-                className="
-                  w-full max-w-sm
-                  lg:w-80
-                  rounded-[36px]
-                  bg-[#4CBC93]
-                  shadow-[0_20px_40px_rgba(0,0,0,0.18)]
-                  flex flex-col items-center
-                  pt-8 pb-8
-                  opacity-90
-                "
-              >
-                <div className="w-full px-6">
-                  <div className="w-full aspect-square rounded-[28px] bg-[#E3FFF2] flex items-center justify-center overflow-hidden">
-                    <img
-                      src={MaterialImg}
-                      alt="Material Challenge"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                </div>
-                <div className="mt-5 text-center text-white font-extrabold text-xl md:text-2xl leading-tight tracking-wide">
-                  Material
-                  <br />
-                  Challenge
-                </div>
-              </div>
+<button
+  type="button"
+  onClick={() => navigate("/material")}
+  className="
+    w-full max-w-sm
+    lg:w-80
+    rounded-[36px]
+    bg-[#4CBC93]
+    shadow-[0_20px_40px_rgba(0,0,0,0.18)]
+    flex flex-col items-center
+    pt-8 pb-8
+    opacity-90
+    transition-transform
+    hover:translate-y-1 hover:shadow-[0_24px_48px_rgba(0,0,0,0.24)]
+  "
+>
+  <div className="w-full px-6">
+    <div className="w-full aspect-square rounded-[28px] bg-[#E3FFF2] flex items-center justify-center overflow-hidden">
+      <img
+        src={MaterialImg}
+        alt="Material Challenge"
+        className="w-full h-full object-contain"
+      />
+    </div>
+  </div>
+  <div className="mt-5 text-center text-white font-extrabold text-xl md:text-2xl leading-tight tracking-wide">
+    Material
+    <br />
+    Challenge
+  </div>
+</button>
+
 
               {/* Story Challenge */}
-              <div
-                className="
-                  w-full max-w-sm
-                  lg:w-80
-                  rounded-[36px]
-                  bg-[#5B4EE6]
-                  shadow-[0_20px_40px_rgba(0,0,0,0.18)]
-                  flex flex-col items-center
-                  pt-8 pb-8
-                  opacity-90
-                "
-              >
+<button
+  type="button"
+  onClick={handleStoryClick}
+  className="
+    w-full max-w-sm
+    lg:w-80
+    rounded-[36px]
+    bg-[#5B4EE6]
+    shadow-[0_20px_40px_rgba(0,0,0,0.18)]
+    flex flex-col items-center
+    pt-8 pb-8
+    opacity-90
+    hover:translate-y-1 hover:shadow-[0_24px_48px_rgba(0,0,0,0.24)]
+    transition-transform
+  "
+>
                 <div className="w-full px-6">
                   <div className="w-full aspect-square rounded-[28px] bg-[#EDE8FF] flex items-center justify-center overflow-hidden">
                     <img
@@ -157,7 +175,7 @@ export const ChallengeIntroPage: React.FC = () => {
                   <br />
                   Challenge
                 </div>
-              </div>
+              </button>
             </div>
           </section>
 
