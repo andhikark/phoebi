@@ -1,5 +1,5 @@
 // src/pages/DesignPage.tsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDesign } from "../state/DesignContext";
 import { COMPONENTS } from "../data/components";
@@ -8,22 +8,32 @@ import type {
   ComponentId,
   MaterialId,
   ScoreResult,
+  TransformMode,
 } from "../types/domain";
 import { getHint } from "../logic/hints";
-import { LearningSpace } from "./LearningSpace";
+import {LearningSpace, type LearningSpaceHandle } from "./LearningSpace";
+import translateIcon from '../assets/icons/translate.png';
+import rotateIcon from '../assets/icons/rotate.png';
+import scaleIcon from '../assets/icons/scale.png';
+import deleteIcon from '../assets/icons/delete.png';
+import { useDesignStore} from "../state/DesignStore";
 
 export const DesignPage: React.FC = () => {
   const navigate = useNavigate();
   const { design, score, setMaterial } = useDesign();
 
   const [activeTab, setActiveTab] = useState<'components' | 'materials'>('components');
+  const [sliderValue, setSliderValue] = useState(50);
 
-  const [activeComponent, setActiveComponent] =
-    useState<ComponentId>("frame");
   const [prevScore, setPrevScore] = useState<ScoreResult | null>(null);
   const [hint, setHint] = useState<string | null>(
     "Try changing the materials and see what happens!"
   );
+
+  const { addObject, selectedObjectId, objects, deleteSelectedObject, setMaterialForSelected } = useDesignStore();
+
+  const [transformMode , setTrasformMode] = useState<TransformMode>("translate");
+  const learningSpaceRef = useRef<LearningSpaceHandle>(null);
 
   useEffect(() => {
     const newHint = getHint(prevScore, score);
@@ -31,13 +41,17 @@ export const DesignPage: React.FC = () => {
     setPrevScore(score);
   }, [score]);
 
+  
+
+  const selectedObject = objects.find(obj => obj.uuid === selectedObjectId);
+  const activeComponentId = selectedObject?.componentId;
   const activeCompDef = COMPONENTS.find(
-    (c) => c.id === activeComponent
-  )!;
-  const activeChoice = design[activeComponent];
-  const allowedMaterials = MATERIALS.filter((m) =>
-    activeCompDef.allowedMaterials.includes(m.id as MaterialId)
+    (c) => c.id === activeComponentId
   );
+  // const activeChoice = design[selectedObj.componentId];
+  const allowedMaterials = activeCompDef
+    ? MATERIALS.filter((m) => activeCompDef.allowedMaterials.includes(m.id as MaterialId))
+    : [];
 
   const scoreColor =
     score.overallScore >= 80
@@ -47,8 +61,19 @@ export const DesignPage: React.FC = () => {
         : "text-red-600";
 
   const onComponentClick = (componentId: ComponentId) => {
-    setActiveComponent(componentId);
-    console.log(componentId + "Has been click")
+    addObject(componentId, 'wood');
+    console.log("Added object : " + JSON.stringify(objects))
+  }
+
+  const onMaterialClick = (materialId: MaterialId) => {
+    if (!selectedObject) return;
+    setMaterial(selectedObject?.componentId, materialId); 
+    setMaterialForSelected(materialId);
+  }
+
+  const handleDeleteClick = () => {
+    learningSpaceRef.current?.deleteSelectedObject();
+    deleteSelectedObject();
   }
 
   return (
@@ -85,15 +110,13 @@ export const DesignPage: React.FC = () => {
       {/* Main */}
       <main className="flex-1 ">
         <div className="flex w-full h-screen bg-gray-100 gap-4 p-4">
-          {/* Left Sidebar: Components & Materials (Fixed Width) */}
           <aside className="w-[300px] bg-[#EBEBE4] shadow-xl flex flex-col">
-            {/* Tab Navigation */}
             <div className="flex bg-gray-200 gap-2">
               <button
                 onClick={() => setActiveTab('components')}
                 className={`flex-1 py-3 text-sm font-semibold transition-colors ${activeTab === 'components'
-                    ? 'bg-[#98B46C] text-white' // Olive green for active tab
-                    : 'bg-[#C5C5BB] text-gray-700 hover:bg-[#B3B3AB]' // Lighter gray for inactive
+                    ? 'bg-[#98B46C] text-white' 
+                    : 'bg-[#C5C5BB] text-gray-700 hover:bg-[#B3B3AB]' 
                   }`}
               >
                 Components
@@ -115,7 +138,7 @@ export const DesignPage: React.FC = () => {
               {activeTab === 'components' && (
                 <div className="grid grid-cols-2 gap-3">
                   {COMPONENTS.map((comp) => {
-                    const isActive = comp.id === activeComponent;
+                    const isActive = comp.id === activeComponentId;
                     return (
                       <button
                         key={comp.id}
@@ -143,12 +166,12 @@ export const DesignPage: React.FC = () => {
               {activeTab === 'materials' && (
                 <div className="grid grid-cols-2 gap-3">
                   {allowedMaterials.map((mat) => {
-                    const isSelected = mat.id === activeChoice.materialId;
+                    const isSelected = mat.id === selectedObject?.materialId;
                     return (
                       <button
                         key={mat.id}
                         type="button"
-                        onClick={() => setMaterial(activeComponent, mat.id as MaterialId)}
+                        onClick={() => onMaterialClick(mat.id)}
                         className={`flex flex-col items-center p-2 h-28 rounded-2xl border transition-all duration-150 ${isSelected
                             ? "ring-4 ring-[#4CBC93] border-white shadow-lg bg-white" 
                             : "bg-white border-gray-200 hover:shadow-md"
@@ -186,7 +209,10 @@ export const DesignPage: React.FC = () => {
             {/* Placeholder for the 3D Truck Model */}
             <div className="relative z-10 w-full h-full flex items-center justify-center">
               {/* Your Three.js canvas would render here. We use a placeholder for alignment. */}
-              <LearningSpace activeComponentId={activeComponent}/>
+              <LearningSpace 
+                transformMode={transformMode}
+                ref={learningSpaceRef}
+              />
             </div>
 
 
@@ -208,15 +234,88 @@ export const DesignPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Objectives - Positioned Top Right of Main Area */}
-            <div className="absolute top-8 right-8 z-20 p-4 rounded-lg bg-white shadow-xl">
-              <h3 className="text-sm font-bold mb-2">Objectives</h3>
-              <ul className="text-sm space-y-1">
-                <li className="text-green-600">0/4 Wheels</li>
-                <li className="text-yellow-600">0/2 Doors</li>
-                <li className="text-red-600">0/2 Windows</li>
-              </ul>
+            <div className="absolute bottom-16 left-8 z-20 space-y-3">
+              {/* Score Card 1: Sustainability */}
+              <div className="flex flex-row justify-between gap-3">
+                <button
+                onClick={() => setTrasformMode("translate")}
+                className={`p-2 rounded-lg shadow-md transition-colors ${
+                  transformMode === "translate"
+                    ? "bg-[#4CBC93] text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-200"
+                }`}
+                title="Translate (Move)"
+              >
+                <img src={translateIcon} alt="Translate" className="h-6 w-6" />
+              </button>
+
+              {/* Rotate Button */}
+              <button
+                onClick={() => setTrasformMode("rotate")}
+                className={`p-2 rounded-lg shadow-md transition-colors ${
+                  transformMode === "rotate"
+                    ? "bg-[#4CBC93] text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-200"
+                }`}
+                title="Rotate"
+              >
+                <img src={rotateIcon} alt="Translate" className="h-6 w-6" />
+              </button>
+
+              {/* Scale Button */}
+              <button
+                onClick={() => setTrasformMode("scale")}
+                className={`p-2 rounded-lg shadow-md transition-colors ${
+                  transformMode === "scale"
+                    ? "bg-[#4CBC93] text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-200"
+                }`}
+                title="Scale"
+              >
+                <img src={scaleIcon} alt="Translate" className="h-6 w-6" />
+              </button>
+              </div>
+              
             </div>
+
+            <div className="absolute top-8 right-8">
+              <div>
+                  <div className="flex flex-row gap-3 items-start">
+                      <button
+                        onClick={handleDeleteClick}
+                        className={`z-20 p-2 bg-white rounded-lg shadow-md transition-colors ${
+                          transformMode === "scale"
+                            ? "bg-[#4CBC93] text-white"
+                            : "bg-white text-gray-700 hover:bg-gray-200"
+                        }`}
+                        title="Delete"
+                      >
+                        <img src={deleteIcon} alt="Delete" className="h-6 w-6" />
+                      </button>
+                    <div className="z-20 p-4 rounded-lg bg-white shadow-xl">
+                      <h3 className="text-sm font-bold mb-2">Objectives</h3>
+                      <ul className="text-sm space-y-1">
+                        <li className="text-green-600">0/4 Wheels</li>
+                        <li className="text-yellow-600">0/2 Doors</li>
+                        <li className="text-red-600">0/2 Windows</li>
+                      </ul>
+                    </div>
+                  </div>
+                <div className="flex flex-col items-start space-y-2">
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={sliderValue}
+                      onChange={(e) => setSliderValue(Number(e.target.value))}
+                      className="w-40 h-2 appearance-none bg-gray-300 rounded-full outline-none slider-vertical"
+                      style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+                    />
+                    <span className="text-xs font-semibold text-gray-600">{50}</span>
+                </div>
+              </div>
+            </div>
+            
           </main>
         </div>
       </main>

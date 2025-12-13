@@ -5,7 +5,28 @@ export type MaterialId =
   | "cardboard"
   | "plastic"
   | "metal"
-  | "recycled_plastic";
+  | "recycled_plastic"
+  | "fsc_rubberwood"
+  | "bamboo_solid"
+  | "bamboo_fibre_viscose"
+  | "organic_cotton"
+  | "natural_rubber_latex"
+  | "tapioca_starch"
+  | "guar_xanthan_gum"
+  | "natural_food_colouring"
+  | "recycled_cardboard"
+  | "pla_sugarcane"
+  | "recycled_abs"
+  | "recycled_pp"
+  | "recycled_hdpe"
+  | "recycled_pet_fabrics"
+  | "bio_pe"
+  | "bio_pvc"
+  | "recycled_pvc"
+  | "recycled_aluminium"
+  | "recycled_steel"
+  | "li_ion_batteries"
+  | "glass_marbles";
 
 export type ComponentId = "frame" | "wheel" | "seat" | "handlebar";
 
@@ -43,3 +64,5 @@ export interface ScoreResult {
   overallScore: number; // 0–100
   perComponent: ScorePerComponent[];
 }
+
+export type TransformMode = 'translate' | 'rotate' | 'scale';
