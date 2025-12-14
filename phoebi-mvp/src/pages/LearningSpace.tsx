@@ -3,13 +3,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import React, { useRef, useEffect, useImperativeHandle } from 'react';
 import type { ComponentId, MaterialId, TransformMode } from '../types/domain';
-import woodTextureUrl from '../assets/textures/wood/oak_veneer_01_diff_4k.jpg';
+
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { useDesignStore, type SceneGroup } from '../state/DesignStore';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import bicycleModelUrl from '../assets/blueprint/bicycle.glb'; 
+import { metalMaterial, newCardboardMaterial, plasticMaterial, recycledCardboardMaterial, woodMaterial } from '../data/materials';
 
 interface LearningSpaceProps {
     transformMode: TransformMode
@@ -23,11 +24,7 @@ export interface LearningSpaceHandle {
     findTouchingObjectUuid: (selectedUuid: string) => string | null;
 }
 
-const textureLoader = new Three.TextureLoader();
 
-const woodMaterial = new Three.MeshStandardMaterial({
-    map: textureLoader.load(woodTextureUrl)
-})
 
 const getGeometryForComponent = (id: ComponentId): Three.BufferGeometry => {
     switch (id) {
@@ -45,17 +42,16 @@ const getGeometryForComponent = (id: ComponentId): Three.BufferGeometry => {
 const getMaterialForComponent = (id: MaterialId) => {
     switch (id) {
         case 'cardboard':
-            return new Three.MeshStandardMaterial({ color: 'red' });
+            return recycledCardboardMaterial;
         case 'metal':
-            return new Three.MeshStandardMaterial({ color: 'black' });
+            return metalMaterial;
         case 'plastic':
-            return new Three.MeshStandardMaterial({ color: 'blue' });
         case 'recycled_plastic':
-            return new Three.MeshStandardMaterial({ color: 'cyan' });
+            return plasticMaterial;
         case 'wood':
             return woodMaterial;
         default:
-            return new Three.MeshStandardMaterial({ color: 0xffff })
+            return newCardboardMaterial
     }
 }
 
@@ -70,9 +66,10 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
     const objectsRef = useRef<Three.Object3D[]>([]);
     const composerRef = useRef<EffectComposer>(null);
     const outlinePassRef = useRef<OutlinePass>(null);
-    const lightRef = useRef<Three.PointLight>(null);
-    const lightHelperRef = useRef<Three.PointLightHelper | null>(null);
+    const lightRef = useRef<Three.DirectionalLight>(null);
+    const lightHelperRef = useRef<Three.DirectionalLightHelper>(null);
     const ambientLightRef = useRef<Three.AmbientLight | null>(null);
+    const hemisphereLightRef = useRef<Three.HemisphereLight | null>(null);
     const objectStateRef = useRef<Map<string, { lastSafePos: Three.Vector3 }>>(new Map());
     const blueprintRef = useRef<Three.Group | null>(null);
 
@@ -192,6 +189,7 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         }
 
         const scene = new Three.Scene();
+        scene.background = new Three.Color(0xbfd1e5);
         sceneRef.current = scene;
 
         const camera = new Three.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -199,40 +197,56 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
 
         const renderer = new Three.WebGLRenderer({
             canvas: canvasRef.current,
+            antialias: true,
         });
         rendererRef.current = renderer;
 
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = Three.PCFSoftShadowMap; 
+        renderer.toneMapping = Three.ACESFilmicToneMapping;
+        renderer.outputColorSpace = Three.SRGBColorSpace;
+
         const floorGeometry = new Three.PlaneGeometry(2000, 2000);
         const floorMaterial = new Three.MeshStandardMaterial({
-            color: 0xd9d9c3,
+            color: 0x808080,
             side: Three.DoubleSide
         });
         const floor = new Three.Mesh(floorGeometry, floorMaterial);
         floor.rotation.x = -Math.PI / 2;
         floor.position.y = -1;
+        floor.receiveShadow = true;
         scene.add(floor);
 
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         camera.position.setZ(30);
 
-        const pointLight = new Three.PointLight(0xffffff, 4);
-        pointLight.position.set(20, 20, 20);
-        lightRef.current = pointLight;
-        
+        const hemisphereLight = new Three.HemisphereLight(0xffffff, 0x444444, 0.5); // Sky color, ground color, intensity
+        scene.add(hemisphereLight);
+        hemisphereLightRef.current = hemisphereLight;
 
-        const ambientLight = new Three.AmbientLight(0xffffff, 4);
-        ambientLightRef.current = ambientLight;
-        scene.add(pointLight, ambientLight);
-
-        const lightHelper = new Three.PointLightHelper(pointLight);
-        lightHelperRef.current = lightHelper;
-        const gridHelper = new Three.GridHelper(2000, 2000);
-        scene.add(lightHelper, gridHelper);
+        const directionalLight = new Three.DirectionalLight(0xffffff, 2);
+        directionalLight.position.set(50, 50, 50); // Position the light source
+        directionalLight.castShadow = true;
 
         const orbitControls = new OrbitControls(camera, renderer.domElement);
         orbitControls.maxPolarAngle = Math.PI / 2;
         orbitControlsRef.current = orbitControls;
+
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.left = -50;
+        directionalLight.shadow.camera.right = 50;
+        directionalLight.shadow.camera.top = 50;
+        directionalLight.shadow.camera.bottom = -50;
+
+        lightRef.current = directionalLight;
+        scene.add(directionalLight);
+
+        const lightHelper = new Three.DirectionalLightHelper(directionalLight, 5); // Use DirectionalLightHelper
+        lightHelperRef.current = lightHelper;
+        const gridHelper = new Three.GridHelper(2000, 2000);
+        scene.add(lightHelper, gridHelper);
 
         //Post processing
         const composer = new EffectComposer(renderer);
@@ -353,7 +367,7 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
             } else {
                 const lightIntersects = lightHelper ? raycaster.intersectObject(lightHelper, true) : [];
                 if (lightIntersects.length > 0) {
-                    transformControls.attach(pointLight);
+                    transformControls.attach(directionalLight);
                     if (outlinePassRef.current) outlinePassRef.current.selectedObjects = [lightHelper];
                 }
             }
@@ -378,16 +392,20 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
     }, []);
 
     useEffect(() => {
-        if(!lightRef.current) return;
-        const t = Math.max(0, Math.min(1, (lightIntensity - 1) / 99));
-        const minIntensity = 0;
-        const maxIntensity = 100;
-        lightRef.current.intensity = Three.MathUtils.lerp(minIntensity, maxIntensity, t);
-        if (lightHelperRef.current) lightHelperRef.current.update();
-        if (ambientLightRef.current) {
-            const minAmb = 0;
-            const maxAmb = 5;
-            ambientLightRef.current.intensity = Three.MathUtils.lerp(minAmb, maxAmb, t);
+        if (!lightRef.current || !hemisphereLightRef.current) return;
+        const t = (lightIntensity - 1) / 99;
+
+        const minDirectionalIntensity = 0.1;
+        const maxDirectionalIntensity = 4.0;
+
+        const minHemisphereIntensity = 0.0;
+        const maxHemisphereIntensity = 1.5;
+
+        lightRef.current.intensity = Three.MathUtils.lerp(minDirectionalIntensity, maxDirectionalIntensity, t);
+        hemisphereLightRef.current.intensity = Three.MathUtils.lerp(minHemisphereIntensity, maxHemisphereIntensity, t);
+
+        if (lightHelperRef.current) {
+            lightHelperRef.current.update();
         }
     }, [lightIntensity])
 

@@ -1,4 +1,96 @@
 import type { Material } from "../types/domain";
+import woodDiffUrl from '../assets/textures/wood/oak_veneer_01_diff_4k.jpg';
+import woodAoUrl from '../assets/textures/wood/oak_veneer_01_ao_4k.jpg';
+import woodDispUrl from '../assets/textures/wood/oak_veneer_01_disp_4k.png';
+import woodRoughUrl from '../assets/textures/wood/oak_veneer_01_arm_4k.jpg';
+
+import bambooColorUrl from '../assets/textures/bamboo/fabric_0024_color_2k.jpg';
+import bambooAoUrl from '../assets/textures/bamboo/fabric_0024_ao_2k.jpg';
+import bambooHeightUrl from '../assets/textures/bamboo/fabric_0024_height_2k.png';
+import bambooNormalUrl from '../assets/textures/bamboo/fabric_0024_normal_opengl_2k.png';
+import bambooRoughnessUrl from '../assets/textures/bamboo/fabric_0024_roughness_2k.jpg';
+
+import newCardboardUrl from '../assets/textures/cardboard/new_cardboard.jpg';
+import recycledCardboardUrl from '../assets/textures/cardboard/recycle_cardboard.jpg';
+
+import oldMetalUrl from '../assets/textures/metal/old_metal.jpg';
+
+import plasticColorUrl from '../assets/textures/plastic/plastic_0018_color_2k.jpg';
+import plasticAoUrl from '../assets/textures/plastic/plastic_0018_ao_2k.jpg';
+import plasticHeightUrl from '../assets/textures/plastic/plastic_0018_height_2k.png';
+import plasticNormalUrl from '../assets/textures/plastic/plastic_0018_normal_opengl_2k.png';
+import plasticRoughnessUrl from '../assets/textures/plastic/plastic_0018_roughness_2k.jpg';
+
+import * as Three from 'three';
+
+const textureLoader = new Three.TextureLoader();
+
+const woodColorMap = textureLoader.load(woodDiffUrl);
+const woodAoMap = textureLoader.load(woodAoUrl);
+const woodDisplacementMap = textureLoader.load(woodDispUrl);
+const woodRoughnessMap = textureLoader.load(woodRoughUrl);
+
+export const woodMaterial = new Three.MeshStandardMaterial({
+    map: woodColorMap,
+
+    aoMap: woodAoMap,
+    aoMapIntensity: 1,
+
+    // displacementMap: woodDisplacementMap,
+    displacementScale: 0.05, 
+
+    roughnessMap: woodRoughnessMap,
+
+    metalness: 0.0, 
+});
+
+const bambooColorMap = textureLoader.load(bambooColorUrl);
+const bambooAoMap = textureLoader.load(bambooAoUrl);
+const bambooDisplacementMap = textureLoader.load(bambooHeightUrl);
+const bambooNormalMap = textureLoader.load(bambooNormalUrl);
+const bambooRoughnessMap = textureLoader.load(bambooRoughnessUrl);
+
+export const bambooMaterial = new Three.MeshStandardMaterial({
+    map: bambooColorMap,
+    aoMap: bambooAoMap,
+    displacementMap: bambooDisplacementMap,
+    normalMap: bambooNormalMap,
+    roughnessMap: bambooRoughnessMap,
+    metalness: 0.0,
+});
+
+export const newCardboardMaterial = new Three.MeshStandardMaterial({
+    map: textureLoader.load(newCardboardUrl),
+    roughness: 0.8,
+    metalness: 0.0,
+});
+
+export const metalMaterial = new Three.MeshStandardMaterial({
+    map: textureLoader.load(oldMetalUrl),
+    metalness: 1.0,
+    roughness: 0.5, 
+});
+
+export const recycledCardboardMaterial = new Three.MeshStandardMaterial({
+    map: textureLoader.load(recycledCardboardUrl),
+    roughness: 0.9,
+    metalness: 0.0,
+});
+
+const plasticColorMap = textureLoader.load(plasticColorUrl);
+const plasticAoMap = textureLoader.load(plasticAoUrl);
+const plasticDisplacementMap = textureLoader.load(plasticHeightUrl);
+const plasticNormalMap = textureLoader.load(plasticNormalUrl);
+const plasticRoughnessMap = textureLoader.load(plasticRoughnessUrl);
+
+export const plasticMaterial = new Three.MeshStandardMaterial({
+    map: plasticColorMap,
+    aoMap: plasticAoMap,
+    // displacementMap: plasticDisplacementMap,
+    normalMap: plasticNormalMap,
+    roughnessMap: plasticRoughnessMap,
+    metalness: 0.1,
+});
 
 export const MATERIALS: Material[] = [
   {
@@ -211,3 +303,5 @@ export const MATERIALS: Material[] = [
   },
 
 ];
+
+
