@@ -81,30 +81,27 @@ const getGeometryForComponent = (id: ComponentId, geometryId?: string): Three.Bu
 }
 
 const getMaterialForComponent = (id: MaterialId) => {
-    switch (id) {
-        case 'recycled_plastic':
-        case 'bamboo_solid':
-        case 'bio_pvc':
-        case 'fsc_rubberwood':
-        case 'organic_cotton':
-        case 'pla_sugarcane':
-        case 'tapioca_starch':
-        case 'recycled_aluminium':
-        case 'natural_rubber_latex':
-        case 'recycled_steel':
-        case 'cardboard':
-            return recycledCardboardMaterial;
-        case 'metal':
-            return metalMaterial;
-        case 'plastic':
-        case 'recycled_plastic':
-            return plasticMaterial;
-        case 'wood':
-            return woodMaterial;
-        default:
-            return newCardboardMaterial
-    }
-}
+  switch (id) {
+    case "metal":
+      return metalMaterial;
+
+    case "plastic":
+      return plasticMaterial;
+
+    case "recycled_plastic":
+      return plasticMaterial; // later you can swap to a real recycled texture
+
+    case "wood":
+      return woodMaterial;
+
+    case "cardboard":
+      return recycledCardboardMaterial; // or newCardboardMaterial if you prefer
+
+    default:
+      return newCardboardMaterial;
+  }
+};
+
 
 export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpaceProps>(({ transformMode, lightIntensity, showBlueprint }, ref) => {
 

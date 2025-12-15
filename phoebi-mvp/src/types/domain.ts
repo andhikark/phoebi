@@ -44,6 +44,8 @@ export interface Material {
   recyclability: number; // 0–10
   durability: number; // 0–10
   density: number; // relative
+
+  icon: string;              // ✅ for UI grid  
 }
 
 export interface ComponentDef {
@@ -51,6 +53,7 @@ export interface ComponentDef {
   name: string;
   volumeFactor: number;
   allowedMaterials: MaterialId[];
+  icon: string;
 }
 
 export interface ComponentChoice {
