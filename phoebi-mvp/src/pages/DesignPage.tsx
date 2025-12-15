@@ -21,10 +21,11 @@ import eraserIcon from '../assets/icons/eraser.png';
 import hintIcon from '../assets/icons/hint.png';
 import { useDesignStore } from "../state/DesignStore";
 import { preloadModels } from "../logic/loadmodel";
+import { inputDispatcher } from "../logic/inputdispatcher";
 
 export const DesignPage: React.FC = () => {
   const navigate = useNavigate();
-  const {score, setMaterial } = useDesign();
+  const { score, setMaterial } = useDesign();
   const [isLoading, setIsLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'components' | 'materials'>('components');
@@ -36,7 +37,7 @@ export const DesignPage: React.FC = () => {
     "Try changing the materials and see what happens!"
   );
 
-  const { addObject, selectedItemId, sceneItems, deleteSelectedItem, setMaterialForSelected, ungroupSelectedItem } = useDesignStore();
+  const { addObject, selectedItemId, sceneItems, deleteSelectedItem, setMaterialForSelected } = useDesignStore();
 
   const [transformMode, setTrasformMode] = useState<TransformMode>("translate");
   const learningSpaceRef = useRef<LearningSpaceHandle>(null);
@@ -60,16 +61,54 @@ export const DesignPage: React.FC = () => {
       });
   }, []);
 
-  const selectedItem = sceneItems.find(obj => obj.uuid === selectedItemId); 
+  useEffect(() => {
+    const unsubscribe = inputDispatcher.subscribe((action) => {
+      switch (action.type) {
+        case "DELETE":
+          handleDeleteClick();
+          break;
+
+        case "GLUE":
+          handleGlueClick();
+          break;
+
+        case "DEGLUE":
+          handleEraseClick();
+          break;
+
+        case "MODE_TRANSLATE":
+          setTrasformMode("translate");
+          break;
+
+        case "MODE_ROTATE":
+          setTrasformMode("rotate");
+          break;
+
+        case "MODE_SCALE":
+          setTrasformMode("scale");
+          break;
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+
+  const selectedItem = sceneItems.find(obj => obj.uuid === selectedItemId);
 
   const selectedObject = sceneItems.find(obj => obj.uuid === selectedItemId);
-  const activeComponentId = selectedItem?.type === 'mesh' ? selectedItem.componentId : undefined; 
+  const activeComponentId =
+    selectedItem?.type === 'object'
+      ? selectedItem.componentId
+      : undefined;
   const activeCompDef = COMPONENTS.find(
     (c) => c.id === activeComponentId
   );
 
   const allowedMaterials = activeCompDef
-    ? MATERIALS.filter((m) => activeCompDef.allowedMaterials.includes(m.id as MaterialId))
+    ? MATERIALS.filter((m) =>
+      activeCompDef.allowedMaterials.includes(m.id as MaterialId)
+    )
     : [];
 
   // const scoreColor =
@@ -84,41 +123,39 @@ export const DesignPage: React.FC = () => {
   }
 
   const onMaterialClick = (materialId: MaterialId) => {
-    if (!selectedObject) return;
-    // setMaterial(selectedObject?.componentId, materialId);
+    if (!selectedItem || selectedItem.type !== 'object') return;
     setMaterialForSelected(materialId);
-  }
-
+  };
   const handleDeleteClick = () => {
     learningSpaceRef.current?.deleteSelectedObject();
     deleteSelectedItem();
   }
 
-  const handleGlueClick = () => { 
-    if (!selectedItemId || !learningSpaceRef.current) return; 
+  const handleGlueClick = () => {
+    if (!selectedItemId || !learningSpaceRef.current) return;
 
-    const touchingObjectUuid = learningSpaceRef.current.findTouchingObjectUuid(selectedItemId); 
+    const touchingObjectUuid = learningSpaceRef.current.findTouchingObjectUuid(selectedItemId);
 
-    if (touchingObjectUuid) { 
-      learningSpaceRef.current.glueObjects(selectedItemId, touchingObjectUuid); 
-    } else { 
-      console.log("No object is touching the selected object."); 
-    } 
+    if (touchingObjectUuid) {
+      learningSpaceRef.current.glueObjects(selectedItemId, touchingObjectUuid);
+    } else {
+      console.log("No object is touching the selected object.");
+    }
   };
 
-  const handleEraseClick = () => { 
-    if (!learningSpaceRef.current || !selectedItemId) {
-      return;
-    }
+  const handleEraseClick = () => {
+    if (!learningSpaceRef.current || !selectedItemId) return;
 
-    const itemToDeglue = sceneItems.find(item => item.uuid === selectedItemId);
+    const itemToDeglue = sceneItems.find(
+      item => item.uuid === selectedItemId
+    );
 
     if (itemToDeglue?.type === 'group') {
       learningSpaceRef.current.deglueObject(selectedItemId);
     } else {
-      console.log("The selected object is not a group and cannot be de-glued.");
+      console.log("Selected item is not a group");
     }
-  } 
+  };
 
   return (
     <div className="min-h-screen bg-[#FFF7C9] flex flex-col">
@@ -210,7 +247,9 @@ export const DesignPage: React.FC = () => {
               {activeTab === 'materials' && (
                 <div className="grid grid-cols-2 gap-3">
                   {allowedMaterials.map((mat) => {
-                    const isSelected = selectedItem?.type === 'mesh' && mat.id === selectedItem.materialId; 
+                    const isSelected =
+                      selectedItem?.type === 'object' &&
+                      mat.id === selectedItem.materialId;
                     return (
                       <button
                         key={mat.id}
@@ -323,15 +362,15 @@ export const DesignPage: React.FC = () => {
 
             <div className="absolute bottom-16 right-8 z-20 space-y-3">
               <button
-                  onClick={() => setShowBlueprint(!showBlueprint)}
-                  className={`p-2 rounded-lg shadow-md transition-colors ${transformMode === "translate"
-                    ? "bg-[#4CBC93] text-white"
-                    : "bg-white text-gray-700 hover:bg-gray-200"
-                    }`}
-                  title="Hint"
-                >
-                  <img src={hintIcon} alt="Hint" className="h-6 w-6" />
-                </button>
+                onClick={() => setShowBlueprint(!showBlueprint)}
+                className={`p-2 rounded-lg shadow-md transition-colors ${transformMode === "translate"
+                  ? "bg-[#4CBC93] text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-200"
+                  }`}
+                title="Hint"
+              >
+                <img src={hintIcon} alt="Hint" className="h-6 w-6" />
+              </button>
             </div>
 
             <div className="absolute top-8 right-8">
@@ -385,7 +424,7 @@ export const DesignPage: React.FC = () => {
                       value={lightValue}
                       onChange={(e) => setLightValue(Number(e.target.value))}
                       className="w-40 h-2 appearance-none bg-gray-300 rounded-full outline-none"
-                      style={{ transform: 'rotate(-90deg)', transformOrigin: 'center right', accentColor: '#16A34A'  }}
+                      style={{ transform: 'rotate(-90deg)', transformOrigin: 'center right', accentColor: '#16A34A' }}
                     />
                   </div>
                 </div>
