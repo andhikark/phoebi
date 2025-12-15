@@ -194,12 +194,7 @@ export const DesignPage: React.FC = () => {
                           : "bg-white border-gray-200 hover:shadow-md"
                           }`}
                       >
-                        {/* Placeholder for the 3D Component Icon */}
-                        <div
-                          className="w-12 h-12 mb-1 rounded-lg"
-                          // Mock colors based on your component list (for visual distinction)
-                          style={{ backgroundColor: comp.id === 'frame' ? '#7A9A0F' : comp.id === 'bicycle_wheel' ? '#B8B8B8' : comp.id === 'seat' ? '#F5C437' : '#5C6D9E' }}
-                        />
+<img src={comp.icon} alt={comp.name} className="w-12 h-12 mb-1 object-contain" />
                         <span className="text-xs font-medium text-gray-700">{comp.name}</span>
                       </button>
                     );
@@ -221,17 +216,10 @@ export const DesignPage: React.FC = () => {
                           : "bg-white border-gray-200 hover:shadow-md"
                           }`}
                       >
-                        {/* Placeholder for the 3D Material Sphere Icon */}
-                        <div
-                          className="w-12 h-12 mb-1 rounded-full"
-                          // Mock material colors (using generic colors as a placeholder for the 3D render)
-                          style={{
-                            backgroundColor: mat.id === 'wood' ? '#8B4513' :
-                              mat.id === 'metal' ? '#A9A9A9' :
-                                mat.id === 'plastic' ? '#5D99C5' :
-                                  mat.id === 'recycled_plastic' ? '#4CBC93' : '#F5C437'
-                          }}
-                        />
+<div className="w-12 h-12 mb-1 rounded-xl bg-gray-100 flex items-center justify-center">
+  <img src={mat.icon} alt={mat.name} className="w-8 h-8 object-contain" />
+</div>
+
                         <span className="text-xs font-medium text-gray-700 text-center">{mat.name}</span>
                       </button>
                     );
