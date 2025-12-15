@@ -9,8 +9,9 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { useDesignStore, type SceneGroup } from '../state/DesignStore';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import bicycleModelUrl from '../assets/blueprint/bicycle.glb'; 
+import bicycleModelUrl from '../assets/blueprint/bicycle.glb';
 import { metalMaterial, newCardboardMaterial, plasticMaterial, recycledCardboardMaterial, woodMaterial } from '../data/materials';
+import { getCachedGeometry, getCachedModel } from '../logic/loadmodel';
 
 interface LearningSpaceProps {
     transformMode: TransformMode
@@ -22,25 +23,69 @@ export interface LearningSpaceHandle {
     deleteSelectedObject: () => void;
     glueObjects: (uuid1: string, uuid2: string) => void;
     findTouchingObjectUuid: (selectedUuid: string) => string | null;
+    deglueObject: (groupUuid: string) => void;
 }
 
+const TARGET_NORMALIZED_SIZE = 10.0;
 
+const getGeometryForComponent = (id: ComponentId, geometryId?: string): Three.BufferGeometry | Three.Group => {
+    let objectAsset: Three.BufferGeometry | Three.Group | undefined;
 
-const getGeometryForComponent = (id: ComponentId): Three.BufferGeometry => {
-    switch (id) {
-        case 'frame':
-            return new Three.BoxGeometry(15, 5, 5);
-        case 'wheel':
-            return new Three.TorusGeometry(5, 1.5, 16, 100);
-        case 'seat':
-            return new Three.CylinderGeometry(3, 3, 1, 32);
-        default:
-            return new Three.SphereGeometry(5);
+    if (geometryId) {
+        objectAsset = getCachedGeometry(geometryId);
+    } else {
+        switch (id) {
+            // All models are handled here now
+            case 'frame':
+            case 'handlebar':
+            case 'lego':
+            case 'bicycle_wheel':
+            case 'seat':
+            case 'car_wheel':
+                const model = getCachedModel(id);
+                if (model) {
+                    const wrapperGroup = new Three.Group();
+                    const center = new Three.Box3().setFromObject(model).getCenter(new Three.Vector3());
+                    model.position.sub(center);
+                    wrapperGroup.add(model);
+                    return wrapperGroup;
+                }
+                return new Three.BoxGeometry(1, 1, 1);
+            default:
+                objectAsset = new Three.SphereGeometry(5);
+                console.warn(`Unknown component ID: ${id}. Using default sphere.`);
+        }
     }
+
+    if (!objectAsset) {
+        console.error(`Asset for ${id} not found!`);
+        return new Three.BoxGeometry(1, 1, 1);
+    }
+
+    // If the asset is a Group (a loaded model), wrap it to center its pivot
+    if (objectAsset instanceof Three.Group) {
+        const wrapperGroup = new Three.Group();
+        const center = new Three.Box3().setFromObject(objectAsset).getCenter(new Three.Vector3());
+        objectAsset.position.sub(center); // Move geometry to center on parent's origin
+        wrapperGroup.add(objectAsset);
+        return wrapperGroup;
+    }
+
+    return objectAsset;
 }
 
 const getMaterialForComponent = (id: MaterialId) => {
     switch (id) {
+        case 'recycled_plastic':
+        case 'bamboo_solid':
+        case 'bio_pvc':
+        case 'fsc_rubberwood':
+        case 'organic_cotton':
+        case 'pla_sugarcane':
+        case 'tapioca_starch':
+        case 'recycled_aluminium':
+        case 'natural_rubber_latex':
+        case 'recycled_steel':
         case 'cardboard':
             return recycledCardboardMaterial;
         case 'metal':
@@ -56,7 +101,7 @@ const getMaterialForComponent = (id: MaterialId) => {
 }
 
 export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpaceProps>(({ transformMode, lightIntensity, showBlueprint }, ref) => {
-    
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sceneRef = useRef<Three.Scene>(null);
     const cameraRef = useRef<Three.PerspectiveCamera>(null);
@@ -68,12 +113,11 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
     const outlinePassRef = useRef<OutlinePass>(null);
     const lightRef = useRef<Three.DirectionalLight>(null);
     const lightHelperRef = useRef<Three.DirectionalLightHelper>(null);
-    const ambientLightRef = useRef<Three.AmbientLight | null>(null);
     const hemisphereLightRef = useRef<Three.HemisphereLight | null>(null);
     const objectStateRef = useRef<Map<string, { lastSafePos: Three.Vector3 }>>(new Map());
     const blueprintRef = useRef<Three.Group | null>(null);
 
-    const { sceneItems, selectedItemId, setSelectedItemId, updateItemTransform, glueObjects } = useDesignStore();
+    const { sceneItems, selectedItemId, setSelectedItemId, updateItemTransform, glueObjects, deglueObject  } = useDesignStore();
 
     useImperativeHandle(ref, () => ({
         deleteSelectedObject: () => {
@@ -116,71 +160,120 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
             if (!obj1 || !obj2) return;
 
             // 1. Flatten the inputs: get all individual meshes from obj1 and obj2. 
-            const allMeshes: Three.Mesh[] = []; 
-            [obj1, obj2].forEach(obj => { 
-                if (obj.type === 'Group') { 
-                    // If it's a group, add its children (which are meshes) 
-                    allMeshes.push(...(obj.children as Three.Mesh[])); 
-                } else if (obj.type === 'Mesh') { 
-                    // If it's a mesh, add it directly 
-                    allMeshes.push(obj as Three.Mesh); 
-                } 
-            }); 
+            const allMeshes: Three.Mesh[] = [];
+            [obj1, obj2].forEach(obj => {
+                obj.traverse((child) => {
+                    if (child instanceof Three.Mesh) {
+                        allMeshes.push(child);
+                    }
+                });
+            });
 
             // 2. Calculate the new group's center based on the world position of all meshes. 
-            const worldPositions = allMeshes.map(mesh => mesh.getWorldPosition(new Three.Vector3())); 
-            const centerBox = new Three.Box3().setFromPoints(worldPositions); 
-            const groupPosition = centerBox.getCenter(new Three.Vector3()); 
+            const worldPositions = allMeshes.map(mesh => mesh.getWorldPosition(new Three.Vector3()));
+            const centerBox = new Three.Box3().setFromPoints(worldPositions);
+            const groupPosition = centerBox.getCenter(new Three.Vector3());
 
             // 3. Use a temporary group and .attach() to calculate correct local positions. 
-            const tempGroup = new Three.Group(); 
-            tempGroup.position.copy(groupPosition); 
+            const tempGroup = new Three.Group();
+            tempGroup.position.copy(groupPosition);
             scene.add(tempGroup); // Add temporarily to scene for attach to work 
-            allMeshes.forEach(mesh => tempGroup.attach(mesh)); 
+            allMeshes.forEach(mesh => tempGroup.attach(mesh));
             scene.remove(tempGroup); // Clean up temporary group 
 
             // 4. Prepare the data structure for the Zustand store. 
-            const groupData: SceneGroup = { 
-                type: 'group', 
-                uuid: `group-${Three.MathUtils.generateUUID()}`, 
-                position: groupPosition.toArray(), 
-                rotation: [0, 0, 0], 
-                scale: [1, 1, 1], 
-                children: allMeshes.map(child => ({ 
-                    type: 'mesh', 
-                    uuid: child.name, 
-                    componentId: (child as any).userData.componentId, 
-                    materialId: (child as any).userData.materialId, 
-                    position: child.position.toArray(), 
-                    rotation: child.rotation.toArray().slice(0, 3) as [number, number, number], 
-                    scale: child.scale.toArray() as [number, number, number], 
-                })) 
-            }; 
+            const groupData: SceneGroup = {
+                type: 'group',
+                uuid: `group-${Three.MathUtils.generateUUID()}`,
+                position: groupPosition.toArray(),
+                rotation: [0, 0, 0],
+                scale: [1, 1, 1],
+                children: allMeshes.map(child => {
+                    if (!(child as any).userData.geometryId) {
+                        console.error("CRITICAL: A mesh is missing its geometryId during a glue operation.", child);
+                        // Returning null and filtering is a safe way to prevent a crash.
+                        return null;
+                    }
+                    return {
+                        type: 'mesh',
+                        uuid: child.name,
+                        // The componentId is now correctly read from the child mesh
+                        componentId: (child as any).userData.componentId,
+                        geometryId: (child as any).userData.geometryId,
+                        materialId: (child as any).userData.materialId,
+                        position: child.position.toArray(),
+                        rotation: child.rotation.toArray().slice(0, 3) as [number, number, number],
+                        scale: child.scale.toArray() as [number, number, number],
+                    };
+                }).filter(Boolean) as any // Filter out any nulls from error cases
+            };
 
             // 5. Call the store action. 
-            glueObjects(groupData, [uuid1, uuid2]); 
+            glueObjects(groupData, [uuid1, uuid2]);
         },
-        findTouchingObjectUuid: (selectedUuid: string) => { 
-            const scene = sceneRef.current; 
-            if (!scene) return null; 
+        findTouchingObjectUuid: (selectedUuid: string) => {
+            const scene = sceneRef.current;
+            if (!scene) return null;
 
-            const selectedObject = objectsRef.current.find(obj => obj.name === selectedUuid); 
-            if (!selectedObject) return null; 
+            const selectedObject = objectsRef.current.find(obj => obj.name === selectedUuid);
+            if (!selectedObject) return null;
 
-            const selectedBox = new Three.Box3().setFromObject(selectedObject); 
+            const selectedBox = new Three.Box3().setFromObject(selectedObject);
 
             // Find the first object that is touching the selected one 
-            for (const otherObject of objectsRef.current) { 
-                if (otherObject.name === selectedUuid) continue; 
+            for (const otherObject of objectsRef.current) {
+                if (otherObject.name === selectedUuid) continue;
 
-                const otherBox = new Three.Box3().setFromObject(otherObject); 
-                if (selectedBox.intersectsBox(otherBox)) { 
+                const otherBox = new Three.Box3().setFromObject(otherObject);
+                if (selectedBox.intersectsBox(otherBox)) {
                     return otherObject.name; // Return the UUID of the touching object 
-                } 
-            } 
+                }
+            }
 
             return null; // No touching object found 
-        } 
+        },
+        deglueObject: (groupUuid: string) => {
+            const scene = sceneRef.current;
+            if (!scene) return;
+
+            const groupToDeglue = scene.getObjectByName(groupUuid);
+
+            // 1. Validate that it's a user-created group
+            // A simple model is a Group containing another Group. A user-created group contains Meshes.
+            if (!groupToDeglue || !(groupToDeglue instanceof Three.Group) || !groupToDeglue.children.every(c => c instanceof Three.Mesh)) {
+                console.warn("Selected object is not a user-created group and cannot be de-glued.");
+                return;
+            }
+
+            // 2. For each child mesh, calculate its world transform and create a new SceneMesh object
+            const newMeshes = groupToDeglue.children.map(child => {
+                const mesh = child as Three.Mesh;
+
+                // Calculate world transforms
+                const worldPosition = new Three.Vector3();
+                const worldQuaternion = new Three.Quaternion();
+                const worldScale = new Three.Vector3();
+                mesh.getWorldPosition(worldPosition);
+                mesh.getWorldQuaternion(worldQuaternion);
+                mesh.getWorldScale(worldScale);
+                const worldRotation = new Three.Euler().setFromQuaternion(worldQuaternion);
+
+                // Create the new SceneMesh data structure for the store
+                return {
+                    type: 'mesh',
+                    uuid: mesh.name, // The original UUID is preserved in the name
+                    componentId: mesh.userData.componentId,
+                    materialId: mesh.userData.materialId,
+                    geometryId: mesh.userData.geometryId,
+                    position: worldPosition.toArray(),
+                    rotation: worldRotation.toArray().slice(0, 3) as [number, number, number],
+                    scale: worldScale.toArray(),
+                } as const; // Using 'as const' helps with type inference
+            });
+
+            // 3. Call the store action to replace the group with the new individual meshes
+            deglueObject(groupUuid, newMeshes);
+        },
     }));
 
     useEffect(() => {
@@ -202,13 +295,13 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         rendererRef.current = renderer;
 
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = Three.PCFSoftShadowMap; 
+        renderer.shadowMap.type = Three.PCFSoftShadowMap;
         renderer.toneMapping = Three.ACESFilmicToneMapping;
         renderer.outputColorSpace = Three.SRGBColorSpace;
 
         const floorGeometry = new Three.PlaneGeometry(2000, 2000);
         const floorMaterial = new Three.MeshStandardMaterial({
-            color: 0x808080,
+            color: 0xded6cb,
             side: Three.DoubleSide
         });
         const floor = new Three.Mesh(floorGeometry, floorMaterial);
@@ -292,46 +385,46 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
                     const offset = floorLevel - boundingBox.min.y;
                     object.position.y += offset;
                 }
-                if (object.name) { 
-                    const movingBox = new Three.Box3().setFromObject(object); 
-                    for (const otherMesh of objectsRef.current) { 
-                        if (otherMesh === object) continue; 
+                if (object.name) {
+                    const movingBox = new Three.Box3().setFromObject(object);
+                    for (const otherMesh of objectsRef.current) {
+                        if (otherMesh === object) continue;
 
-                        const otherBox = new Three.Box3().setFromObject(otherMesh); 
-                        if (movingBox.intersectsBox(otherBox)) { 
-                            
+                        const otherBox = new Three.Box3().setFromObject(otherMesh);
+                        if (movingBox.intersectsBox(otherBox)) {
+
                             // Calculate the vector from the other object to the moving one
-                            const movingCenter = new Three.Vector3(); 
-                            movingBox.getCenter(movingCenter); 
-                            const otherCenter = new Three.Vector3(); 
-                            otherBox.getCenter(otherCenter); 
-                            
+                            const movingCenter = new Three.Vector3();
+                            movingBox.getCenter(movingCenter);
+                            const otherCenter = new Three.Vector3();
+                            otherBox.getCenter(otherCenter);
+
                             // Calculate overlap on each axis
-                            const overlap = new Three.Vector3(); 
-                            overlap.x = Math.min(movingBox.max.x, otherBox.max.x) - Math.max(movingBox.min.x, otherBox.min.x); 
-                            overlap.y = Math.min(movingBox.max.y, otherBox.max.y) - Math.max(movingBox.min.y, otherBox.min.y); 
-                            overlap.z = Math.min(movingBox.max.z, otherBox.max.z) - Math.max(movingBox.min.z, otherBox.min.z); 
+                            const overlap = new Three.Vector3();
+                            overlap.x = Math.min(movingBox.max.x, otherBox.max.x) - Math.max(movingBox.min.x, otherBox.min.x);
+                            overlap.y = Math.min(movingBox.max.y, otherBox.max.y) - Math.max(movingBox.min.y, otherBox.min.y);
+                            overlap.z = Math.min(movingBox.max.z, otherBox.max.z) - Math.max(movingBox.min.z, otherBox.min.z);
 
                             // Find the axis with the minimum overlap (this is the axis to push out on)
-                            if (overlap.x < overlap.y && overlap.x < overlap.z) { 
-                                const sign = Math.sign(movingCenter.x - otherCenter.x); 
-                                object.position.x += (overlap.x * sign); 
-                            } else if (overlap.y < overlap.z) { 
-                                const sign = Math.sign(movingCenter.y - otherCenter.y); 
-                                object.position.y += (overlap.y * sign); 
-                            } else { 
-                                const sign = Math.sign(movingCenter.z - otherCenter.z); 
-                                object.position.z += (overlap.z * sign); 
-                            } 
-                        } 
-                    } 
-
-                    const state = objectStateRef.current.get(object.name); 
-                    if (state) { 
-                        // Always update the safe position after resolution
-                        state.lastSafePos.copy(object.position); 
+                            if (overlap.x < overlap.y && overlap.x < overlap.z) {
+                                const sign = Math.sign(movingCenter.x - otherCenter.x);
+                                object.position.x += (overlap.x * sign);
+                            } else if (overlap.y < overlap.z) {
+                                const sign = Math.sign(movingCenter.y - otherCenter.y);
+                                object.position.y += (overlap.y * sign);
+                            } else {
+                                const sign = Math.sign(movingCenter.z - otherCenter.z);
+                                object.position.z += (overlap.z * sign);
+                            }
+                        }
                     }
-                } 
+
+                    const state = objectStateRef.current.get(object.name);
+                    if (state) {
+                        // Always update the safe position after resolution
+                        state.lastSafePos.copy(object.position);
+                    }
+                }
             }
         });
         scene.add(transformControls.getHelper());
@@ -356,9 +449,9 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
 
             if (intersects.length > 0) {
                 let newSelectedObject = intersects[0].object;
-                while (newSelectedObject.parent && newSelectedObject.parent !== scene) { 
-                    newSelectedObject = newSelectedObject.parent; 
-                } 
+                while (newSelectedObject.parent && newSelectedObject.parent !== scene) {
+                    newSelectedObject = newSelectedObject.parent;
+                }
                 const objectUUID = newSelectedObject.name;
 
                 if (objectUUID) {
@@ -416,92 +509,142 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
 
         if (!scene || !transformControls || !outlinePass) return;
 
-        objectsRef.current.forEach(obj => { 
-            scene.remove(obj); 
-        }); 
-        objectsRef.current = []; 
-        objectStateRef.current.clear(); 
+        objectsRef.current.forEach(obj => {
+            scene.remove(obj);
+        });
+        objectsRef.current = [];
+        objectStateRef.current.clear();
 
-       sceneItems.forEach(item => { 
-            if (item.type === 'group') { 
-                const group = new Three.Group(); 
-                group.name = item.uuid; 
+        sceneItems.forEach(item => {
+            let newObject: Three.Object3D;
 
-                if (item.position) group.position.fromArray(item.position); 
-                if (item.rotation) group.rotation.fromArray(item.rotation); 
+            if (item.type === 'group') {
+                const group = new Three.Group();
+                group.name = item.uuid;
+                if (item.position) group.position.fromArray(item.position);
+                if (item.rotation) group.rotation.fromArray(item.rotation);
                 if (item.scale) group.scale.fromArray(item.scale);
 
-                item.children.forEach(childMesh => { 
-                    const geometry = getGeometryForComponent(childMesh.componentId); 
-                    const material = getMaterialForComponent(childMesh.materialId); 
-                    const mesh = new Three.Mesh(geometry, material); 
-                    mesh.name = childMesh.uuid; 
-                    // Note: Positions of children are relative to the group. 
-                    // The .attach() method used during gluing handled this. 
-                    mesh.userData = { componentId: childMesh.componentId, materialId: childMesh.materialId }; 
+                item.children.forEach(childData => {
+                    // Use the geometryId to get the exact mesh piece
+                    const childAsset = getGeometryForComponent(childData.componentId, (childData as any).geometryId);
+                    const material = getMaterialForComponent(childData.materialId);
+                    const childMesh = new Three.Mesh(childAsset as Three.BufferGeometry, material);
                     
-                    // Set child's LOCAL transform from store data 
-                    if (childMesh.position) mesh.position.fromArray(childMesh.position); 
-                    if (childMesh.rotation) mesh.rotation.fromArray(childMesh.rotation); 
-                    if (childMesh.scale) mesh.scale.fromArray(childMesh.scale);
-                    group.add(mesh); 
-                }); 
+                    // Restore transform and crucially, the userData for the next glue operation
+                    childMesh.name = childData.uuid;
 
-                scene.add(group); 
-                objectsRef.current.push(group); 
-                // Note: Collision state for groups would need to be handled differently. 
-
+                    // --- FIX: Add checks to ensure properties exist before using them ---
+                    if (childData.position) {
+                        childMesh.position.fromArray(childData.position);
+                    }
+                    if (childData.rotation) {
+                        childMesh.rotation.fromArray(childData.rotation as any);
+                    }
+                    if (childData.scale) {
+                        childMesh.scale.fromArray(childData.scale);
+                    }
+                    
+                    childMesh.userData = {
+                        componentId: childData.componentId,
+                        materialId: childData.materialId,
+                        geometryId: (childData as any).geometryId
+                    };
+                    group.add(childMesh);
+                });
+                newObject = group;
             } else {
-                const geometry = getGeometryForComponent(item.componentId);
+                const objectAsset = getGeometryForComponent(item.componentId);
                 const material = getMaterialForComponent(item.materialId);
-                const newMesh = new Three.Mesh(geometry, material);
-                newMesh.name = item.uuid;
+                
+                // --- FIX: Remove the redundant declaration of newObject ---
+                // let newObject: Three.Object3D; // This line was causing the error.
 
-                newMesh.userData = { componentId: item.componentId, materialId: item.materialId };
+                if (objectAsset instanceof Three.BufferGeometry) {
+                    // It's a simple primitive, create a Mesh
+                    newObject = new Three.Mesh(objectAsset, material);
+                } else {
+                    // It's a complex model (Group)
+                    newObject = objectAsset;
 
+                    newObject.traverse((child) => {
+                        if (child instanceof Three.Mesh) {
+                            child.material = material;
+                            child.userData = {
+                                componentId: item.componentId,
+                                materialId: item.materialId,
+                                // geometryId was set in loadmodel.ts and is preserved on the child
+                                geometryId: (child as any).userData.geometryId 
+                            };
+                        }
+                    });
+                }
+
+                // 3. Set top-level properties
+                newObject.name = item.uuid;
+                newObject.userData = { componentId: item.componentId, materialId: item.materialId };
+
+                // 4. Handle transform: either spawn a new object or restore an existing one
                 if (!item.position) {
-                    geometry.computeBoundingBox();
-                    const size = new Three.Vector3();
-                    geometry.boundingBox!.getSize(size);
-                    let spawnPosition = new Three.Vector3(0, size.y / 2 + 0.01, 0);
+                    // This is a BRAND NEW object. Normalize and find a spawn position.
+                    
+                    // A. Calculate normalization scale based on the clean, wrapped object
+                    const initialBBox = new Three.Box3().setFromObject(newObject);
+                    const initialSize = new Three.Vector3();
+                    initialBBox.getSize(initialSize);
+                    const maxDim = Math.max(initialSize.x, initialSize.y, initialSize.z);
+                    
+                    if (maxDim > 0) { // Avoid division by zero
+                        const scaleFactor = TARGET_NORMALIZED_SIZE / maxDim;
+                        newObject.scale.set(scaleFactor, scaleFactor, scaleFactor);
+                    }
+
+                    // B. Find a non-overlapping spawn position
+                    const normalizedBBox = new Three.Box3().setFromObject(newObject);
+                    const normalizedSize = new Three.Vector3();
+                    normalizedBBox.getSize(normalizedSize);
+
+                    let spawnPosition = new Three.Vector3(0, normalizedSize.y / 2, 0);
                     let isOccupied = true, attempts = 0;
                     while (isOccupied && attempts < 100) {
                         isOccupied = false;
-                        const prospectiveBBox = new Three.Box3().setFromCenterAndSize(spawnPosition, size);
+                        const prospectiveBBox = new Three.Box3().setFromCenterAndSize(spawnPosition, normalizedSize);
                         for (const existing of objectsRef.current) {
                             if (prospectiveBBox.intersectsBox(new Three.Box3().setFromObject(existing))) {
                                 isOccupied = true;
-                                spawnPosition.x += size.x + 2;
+                                spawnPosition.x += normalizedSize.x + 2;
                                 break;
                             }
                         }
                         attempts++;
                     }
-                    newMesh.position.copy(spawnPosition);
-                    updateItemTransform(item.uuid, spawnPosition.toArray(), [0, 0, 0], [1, 1, 1]);
+                    newObject.position.copy(spawnPosition);
+
+                    updateItemTransform(item.uuid, newObject.position.toArray(), newObject.rotation.toArray().slice(0,3) as [number,number,number], newObject.scale.toArray() as [number,number,number]);
+                
                 } else {
-                    newMesh.position.fromArray(item.position);
-                    if (item.rotation) newMesh.rotation.fromArray(item.rotation);
-                    if (item.scale) newMesh.scale.fromArray(item.scale);
+                    newObject.position.fromArray(item.position);
+                    if (item.rotation) newObject.rotation.fromArray(item.rotation as any);
+                    if (item.scale) newObject.scale.fromArray(item.scale);
                 }
-                scene.add(newMesh);
-                objectsRef.current.push(newMesh);
-                objectStateRef.current.set(newMesh.name, { lastSafePos: newMesh.position.clone() });
             }
-        }); 
+            scene.add(newObject);
+            objectsRef.current.push(newObject);
+            objectStateRef.current.set(newObject.name, { lastSafePos: newObject.position.clone() });
+        });
 
         // 3. Update selection based on the store. 
-        const selectedObjectInScene = objectsRef.current.find(obj => obj.name === selectedItemId); 
+        const selectedObjectInScene = objectsRef.current.find(obj => obj.name === selectedItemId);
 
-        if (selectedObjectInScene) { 
-            transformControls.attach(selectedObjectInScene); 
-            outlinePass.selectedObjects = [selectedObjectInScene]; 
-        } else { 
-            if (transformControls.object) { 
-                transformControls.detach(); 
-                outlinePass.selectedObjects = []; 
-            } 
-        } 
+        if (selectedObjectInScene) {
+            transformControls.attach(selectedObjectInScene);
+            outlinePass.selectedObjects = [selectedObjectInScene];
+        } else {
+            if (transformControls.object) {
+                transformControls.detach();
+                outlinePass.selectedObjects = [];
+            }
+        }
 
     }, [sceneItems, selectedItemId]);
 
@@ -512,39 +655,39 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         }
     }, [transformMode])
 
-    useEffect(() => { 
-        const scene = sceneRef.current; 
-        if (!scene) return; 
+    useEffect(() => {
+        const scene = sceneRef.current;
+        if (!scene) return;
 
         // If blueprint is requested and not yet loaded 
-        if (showBlueprint && !blueprintRef.current) { 
-            const loader = new GLTFLoader(); 
-            loader.load(bicycleModelUrl, (gltf) => { 
-                const blueprintGroup = new Three.Group(); 
-                const blueprintMaterial = new Three.LineBasicMaterial({ color: 0xffff, transparent: true, opacity: 0.5 }); 
+        if (showBlueprint && !blueprintRef.current) {
+            const loader = new GLTFLoader();
+            loader.load(bicycleModelUrl, (gltf) => {
+                const blueprintGroup = new Three.Group();
+                const blueprintMaterial = new Three.LineBasicMaterial({ color: 0xffff, transparent: true, opacity: 0.5 });
 
-                gltf.scene.traverse((child) => { 
-                    if (child instanceof Three.Mesh) { 
-                        const edges = new Three.EdgesGeometry(child.geometry); 
-                        const line = new Three.LineSegments(edges, blueprintMaterial); 
-                        line.position.copy(child.position); 
-                        line.rotation.copy(child.rotation); 
-                        line.scale.copy(child.scale); 
-                        blueprintGroup.add(line); 
-                    } 
-                }); 
+                gltf.scene.traverse((child) => {
+                    if (child instanceof Three.Mesh) {
+                        const edges = new Three.EdgesGeometry(child.geometry);
+                        const line = new Three.LineSegments(edges, blueprintMaterial);
+                        line.position.copy(child.position);
+                        line.rotation.copy(child.rotation);
+                        line.scale.copy(child.scale);
+                        blueprintGroup.add(line);
+                    }
+                });
 
-                const box = new Three.Box3().setFromObject(blueprintGroup); 
-                const center = box.getCenter(new Three.Vector3()); 
-                blueprintGroup.position.sub(center).add(new Three.Vector3(0, box.getSize(new Three.Vector3()).y / 2, 0)); 
-                
-                scene.add(blueprintGroup); 
-                blueprintRef.current = blueprintGroup; 
-            }); 
-        } else if (blueprintRef.current) { 
+                const box = new Three.Box3().setFromObject(blueprintGroup);
+                const center = box.getCenter(new Three.Vector3());
+                blueprintGroup.position.sub(center).add(new Three.Vector3(0, box.getSize(new Three.Vector3()).y / 2, 0));
+
+                scene.add(blueprintGroup);
+                blueprintRef.current = blueprintGroup;
+            });
+        } else if (blueprintRef.current) {
             // If blueprint is already loaded, just toggle its visibility 
-            blueprintRef.current.visible = showBlueprint; 
-        } 
+            blueprintRef.current.visible = showBlueprint;
+        }
     }, [showBlueprint]);
 
     return (

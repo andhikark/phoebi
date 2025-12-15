@@ -15,9 +15,12 @@ import { computeScore } from "../logic/ere";
 
 const defaultDesign: DesignState = {
   frame: { materialId: "wood" },
-  wheel: { materialId: "plastic" },
+  bicycle_wheel: { materialId: "plastic" },
   seat: { materialId: "cardboard" },
   handlebar: { materialId: "wood" },
+  lego: {materialId: 'plastic'},
+  battery: {materialId: 'recycled_aluminium'},
+  car_wheel: {materialId: 'plastic'}
 };
 
 interface DesignContextValue {

@@ -28,7 +28,14 @@ export type MaterialId =
   | "li_ion_batteries"
   | "glass_marbles";
 
-export type ComponentId = "frame" | "wheel" | "seat" | "handlebar";
+export type ComponentId = 
+  "frame" | 
+  "bicycle_wheel" | 
+  "seat" | 
+  "handlebar" |
+  "battery" |
+  "lego" | 
+  "car_wheel";
 
 export interface Material {
   id: MaterialId;

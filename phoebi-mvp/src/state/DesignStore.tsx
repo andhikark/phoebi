@@ -7,6 +7,7 @@ export interface SceneMesh {
     uuid: string;
     componentId: ComponentId;
     materialId: MaterialId;
+    geometryId?: string;
     position?: [number, number, number];
     rotation?: [number, number, number];
     scale?: [number, number, number];
@@ -32,6 +33,7 @@ interface DesignState {
     deleteSelectedItem: () => void;
     setMaterialForSelected: (materialId: MaterialId) => void;
     glueObjects: (groupData: SceneGroup, originalUuids: [string, string]) => void; 
+    deglueObject: (groupUuid: string, newMeshes: SceneMesh[]) => void;
     ungroupSelectedItem: () => void;
     updateItemTransform: (uuid: string, position: [number, number, number], rotation: [number, number, number], scale: [number, number, number]) => void;
 }
@@ -98,6 +100,12 @@ export const useDesignStore = create<DesignState>((set) => ({
             selectedItemId: groupData.uuid, // Select the new group 
         }; 
     }),
+    deglueObject: (groupUuid, newMeshes) => set(state => ({
+        sceneItems: [
+            ...state.sceneItems.filter(item => item.uuid !== groupUuid),
+            ...newMeshes
+        ]
+    })),
     ungroupSelectedItem: () => set(state => { 
         if (!state.selectedItemId) return {}; 
 

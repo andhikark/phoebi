@@ -20,10 +20,12 @@ import glueIcon from '../assets/icons/glue.png';
 import eraserIcon from '../assets/icons/eraser.png';
 import hintIcon from '../assets/icons/hint.png';
 import { useDesignStore } from "../state/DesignStore";
+import { preloadModels } from "../logic/loadmodel";
 
 export const DesignPage: React.FC = () => {
   const navigate = useNavigate();
-  const {score } = useDesign();
+  const {score, setMaterial } = useDesign();
+  const [isLoading, setIsLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'components' | 'materials'>('components');
   const [lightValue, setLightValue] = useState(50);
@@ -44,6 +46,19 @@ export const DesignPage: React.FC = () => {
     if (newHint) setHint(newHint);
     setPrevScore(score);
   }, [score]);
+
+  useEffect(() => {
+    preloadModels()
+      .then(() => {
+        console.log("All models pre-loaded successfully.");
+        setIsLoading(false);
+      })
+      .catch(error => {
+        console.error("Failed to preload models:", error);
+        // Handle error, maybe show an error message
+        setIsLoading(false);
+      });
+  }, []);
 
   const selectedItem = sceneItems.find(obj => obj.uuid === selectedItemId); 
 
@@ -92,7 +107,17 @@ export const DesignPage: React.FC = () => {
   };
 
   const handleEraseClick = () => { 
-    ungroupSelectedItem(); 
+    if (!learningSpaceRef.current || !selectedItemId) {
+      return;
+    }
+
+    const itemToDeglue = sceneItems.find(item => item.uuid === selectedItemId);
+
+    if (itemToDeglue?.type === 'group') {
+      learningSpaceRef.current.deglueObject(selectedItemId);
+    } else {
+      console.log("The selected object is not a group and cannot be de-glued.");
+    }
   } 
 
   return (
@@ -173,7 +198,7 @@ export const DesignPage: React.FC = () => {
                         <div
                           className="w-12 h-12 mb-1 rounded-lg"
                           // Mock colors based on your component list (for visual distinction)
-                          style={{ backgroundColor: comp.id === 'frame' ? '#7A9A0F' : comp.id === 'wheel' ? '#B8B8B8' : comp.id === 'seat' ? '#F5C437' : '#5C6D9E' }}
+                          style={{ backgroundColor: comp.id === 'frame' ? '#7A9A0F' : comp.id === 'bicycle_wheel' ? '#B8B8B8' : comp.id === 'seat' ? '#F5C437' : '#5C6D9E' }}
                         />
                         <span className="text-xs font-medium text-gray-700">{comp.name}</span>
                       </button>

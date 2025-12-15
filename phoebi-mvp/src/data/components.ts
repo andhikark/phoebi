@@ -10,7 +10,7 @@ export const COMPONENTS: ComponentDef[] = [
     allowedMaterials: ["wood", "cardboard", "plastic", "metal", "recycled_plastic"],
   },
   {
-    id: "wheel",
+    id: "bicycle_wheel",
     name: "Wheels",
     volumeFactor: 2,
     allowedMaterials: ["plastic", "metal", "recycled_plastic"],
@@ -26,5 +26,17 @@ export const COMPONENTS: ComponentDef[] = [
     name: "Handlebar",
     volumeFactor: 1,
     allowedMaterials: ["wood", "plastic", "metal", "recycled_plastic"],
+  },
+  {
+    id: "lego",
+    name: "Lego",
+    volumeFactor: 1,
+    allowedMaterials: ["plastic"],
+  },
+  {
+    id: "car_wheel",
+    name: "Car wheel",
+    volumeFactor: 1,
+    allowedMaterials: ["plastic"],
   },
 ];
