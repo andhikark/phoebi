@@ -35,7 +35,27 @@ export type ComponentId =
   "handlebar" |
   "battery" |
   "lego" | 
-  "car_wheel";
+  "car_wheel"
+  | "box"
+  | "capsule"
+  | "circle"
+  | "cone"
+  | "cylinder"
+  | "dodecahedron"
+  | "edges"
+  | "extrude"
+  | "icosahedron"
+  | "lathe"
+  | "octahedron"
+  | "plane"
+  | "polyhedron"
+  | "ring"
+  | "shape"
+  | "sphere"
+  | "tetrahedron"
+  | "torus"
+  | "torusKnot"
+  | "tube";
 
 export interface Material {
   id: MaterialId;

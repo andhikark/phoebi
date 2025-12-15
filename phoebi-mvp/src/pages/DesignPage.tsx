@@ -19,6 +19,9 @@ import deleteIcon from '../assets/icons/delete.png';
 import glueIcon from '../assets/icons/glue.png';
 import eraserIcon from '../assets/icons/eraser.png';
 import hintIcon from '../assets/icons/hint.png';
+import collisionOff from '../assets/icons/collision_off.png';
+import collisionOn from '../assets/icons/collision_on.png';
+import duplicateIcon from '../assets/icons/duplicate.png';
 import { useDesignStore } from "../state/DesignStore";
 import { preloadModels } from "../logic/loadmodel";
 import { inputDispatcher } from "../logic/inputdispatcher";
@@ -36,6 +39,8 @@ export const DesignPage: React.FC = () => {
   const [hint, setHint] = useState<string | null>(
     "Try changing the materials and see what happens!"
   );
+
+  const [collisionEnabled, setCollisionEnabled] = useState(true);
 
   const { addObject, selectedItemId, sceneItems, deleteSelectedItem, setMaterialForSelected } = useDesignStore();
 
@@ -87,6 +92,10 @@ export const DesignPage: React.FC = () => {
         case "MODE_SCALE":
           setTrasformMode("scale");
           break;
+
+        case "DUPLICATE":
+          handleDuplicate();
+          break;
       }
     });
 
@@ -96,7 +105,7 @@ export const DesignPage: React.FC = () => {
 
   const selectedItem = sceneItems.find(obj => obj.uuid === selectedItemId);
 
-  const selectedObject = sceneItems.find(obj => obj.uuid === selectedItemId);
+  // const selectedObject = sceneItems.find(obj => obj.uuid === selectedItemId);
   const activeComponentId =
     selectedItem?.type === 'object'
       ? selectedItem.componentId
@@ -156,6 +165,12 @@ export const DesignPage: React.FC = () => {
       console.log("Selected item is not a group");
     }
   };
+
+  const handleDuplicate = () => {
+    if (!learningSpaceRef.current || !selectedItemId) return;
+
+    learningSpaceRef.current.duplicateObject();
+  }
 
   return (
     <div className="min-h-screen bg-[#FFF7C9] flex flex-col">
@@ -231,7 +246,7 @@ export const DesignPage: React.FC = () => {
                           : "bg-white border-gray-200 hover:shadow-md"
                           }`}
                       >
-<img src={comp.icon} alt={comp.name} className="w-12 h-12 mb-1 object-contain" />
+                        <img src={comp.icon} alt={comp.name} className="w-12 h-12 mb-1 object-contain" />
                         <span className="text-xs font-medium text-gray-700">{comp.name}</span>
                       </button>
                     );
@@ -255,9 +270,9 @@ export const DesignPage: React.FC = () => {
                           : "bg-white border-gray-200 hover:shadow-md"
                           }`}
                       >
-<div className="w-12 h-12 mb-1 rounded-xl bg-gray-100 flex items-center justify-center">
-  <img src={mat.icon} alt={mat.name} className="w-8 h-8 object-contain" />
-</div>
+                        <div className="w-12 h-12 mb-1 rounded-xl bg-gray-100 flex items-center justify-center">
+                          <img src={mat.icon} alt={mat.name} className="w-8 h-8 object-contain" />
+                        </div>
 
                         <span className="text-xs font-medium text-gray-700 text-center">{mat.name}</span>
                       </button>
@@ -281,6 +296,7 @@ export const DesignPage: React.FC = () => {
             <div className="relative z-10 w-full h-full flex items-center justify-center">
               {/* Your Three.js canvas would render here. We use a placeholder for alignment. */}
               <LearningSpace
+                collisionEnabled={collisionEnabled}
                 transformMode={transformMode}
                 showBlueprint={showBlueprint}
                 lightIntensity={lightValue}
@@ -308,6 +324,15 @@ export const DesignPage: React.FC = () => {
             </div>
 
             <div className="absolute bottom-16 left-8 z-20 space-y-3">
+              <button
+                onClick={() => setCollisionEnabled(v => !v)}
+                className={`p-2 rounded-lg shadow-md transition-colors ${collisionEnabled ? "bg-[#ffba08]" : "bg-white"
+                  }`}
+                title={collisionEnabled ? "Collision ON" : "Collision OFF"}
+              >
+                <img src={collisionEnabled ? collisionOn : collisionOff} className="h-6 w-6" />
+              </button>
+
               {/* Score Card 1: Sustainability */}
               <div className="flex flex-row justify-between gap-3">
                 <button
@@ -363,6 +388,16 @@ export const DesignPage: React.FC = () => {
 
             <div className="absolute top-8 right-8">
               <div className="flex items-start gap-4">
+                <button
+                  onClick={handleDuplicate}
+                  className={`z-20 p-2 bg-white rounded-lg shadow-md transition-colors ${transformMode === "scale"
+                    ? "bg-[#4CBC93] text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-200"
+                    }`}
+                  title="Duplication"
+                >
+                  <img src={duplicateIcon} alt="Duplicate" className="h-6 w-6" />
+                </button>
                 <button
                   onClick={handleEraseClick}
                   className={`z-20 p-2 bg-white rounded-lg shadow-md transition-colors ${transformMode === "scale"

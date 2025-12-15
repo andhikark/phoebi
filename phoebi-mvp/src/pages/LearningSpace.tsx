@@ -2,7 +2,7 @@ import * as Three from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import React, { useRef, useEffect, useImperativeHandle } from 'react';
-import type { ComponentId, MaterialId, TransformMode } from '../types/domain';
+import type { MaterialId, TransformMode } from '../types/domain';
 
 import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -11,12 +11,21 @@ import { useDesignStore, type SceneGroup, type SceneItem, type SceneObject } fro
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import bicycleModelUrl from '../assets/blueprint/bicycle.glb';
 import { metalMaterial, newCardboardMaterial, plasticMaterial, recycledCardboardMaterial, woodMaterial } from '../data/materials';
-import { getCachedGeometry, getCachedModel } from '../logic/loadmodel';
+import skyboxNx from "../assets/skybox/clouds horizon/jettelly_blue_sky_BACK.png"
+import skyboxNy from "../assets/skybox/clouds horizon/jettelly_blue_sky_DOWN.png"
+import skyboxNz from "../assets/skybox/clouds horizon/jettelly_blue_sky_LEFT.png"
+import skyboxPx from "../assets/skybox/clouds horizon/jettelly_blue_sky_FRONT.png"
+import skyboxPy from "../assets/skybox/clouds horizon/jettelly_blue_sky_UP.png"
+import skyboxPz from "../assets/skybox/clouds horizon/jettelly_blue_sky_RIGHT.png"
+import { getCachedModel } from '../logic/loadmodel';
+import { newUuid } from '../logic/util';
+
 
 interface LearningSpaceProps {
     transformMode: TransformMode
     lightIntensity: number
     showBlueprint: boolean;
+    collisionEnabled: boolean;
 }
 
 export interface LearningSpaceHandle {
@@ -24,6 +33,7 @@ export interface LearningSpaceHandle {
     glueObjects: (uuid1: string, uuid2: string) => void;
     findTouchingObjectUuid: (selectedUuid: string) => string | null;
     deglueObject: (groupUuid: string) => void;
+    duplicateObject: () => void;
 }
 
 function extractObjects(item: SceneItem): SceneObject[] {
@@ -31,79 +41,103 @@ function extractObjects(item: SceneItem): SceneObject[] {
     return item.children.flatMap(extractObjects);
 }
 
+function setCubeSkybox(
+    scene: Three.Scene,
+    renderer: Three.WebGLRenderer,
+    urls: {
+        px: string;
+        nx: string;
+        py: string;
+        ny: string;
+        pz: string;
+        nz: string;
+    }
+) {
+    const loader = new Three.CubeTextureLoader();
 
-const TARGET_NORMALIZED_SIZE = 10.0;
+    const cube = loader.load([
+        urls.px,
+        urls.nx,
+        urls.py,
+        urls.ny,
+        urls.pz,
+        urls.nz,
+    ]);
 
-const getGeometryForComponent = (id: ComponentId, geometryId?: string): Three.BufferGeometry | Three.Group => {
-    let objectAsset: Three.BufferGeometry | Three.Group | undefined;
+    cube.colorSpace = Three.SRGBColorSpace;
 
-    if (geometryId) {
-        objectAsset = getCachedGeometry(geometryId);
-    } else {
-        switch (id) {
-            // All models are handled here now
-            case 'frame':
-            case 'handlebar':
-            case 'lego':
-            case 'bicycle_wheel':
-            case 'seat':
-            case 'car_wheel':
-                const model = getCachedModel(id);
-                if (model) {
-                    const wrapperGroup = new Three.Group();
-                    const center = new Three.Box3().setFromObject(model).getCenter(new Three.Vector3());
-                    model.position.sub(center);
-                    wrapperGroup.add(model);
-                    return wrapperGroup;
-                }
-                return new Three.BoxGeometry(1, 1, 1);
-            default:
-                objectAsset = new Three.SphereGeometry(5);
-                console.warn(`Unknown component ID: ${id}. Using default sphere.`);
+    // background (what you see)
+    scene.background = cube;
+
+    // environment (what lights/reflections use) -> blur/filter via PMREM
+    const pmrem = new Three.PMREMGenerator(renderer);
+    pmrem.compileCubemapShader();
+
+    const envMap = pmrem.fromCubemap(cube).texture;
+
+    // Dispose previous env map if you ever re-call this
+    const prevEnv = scene.environment as Three.Texture | null;
+    scene.environment = envMap;
+
+    // tune this (start low)
+    scene.environmentIntensity = 0.15;
+
+    // cleanup
+    if (prevEnv) prevEnv.dispose();
+    pmrem.dispose();
+}
+
+
+function cloneSceneItemWithNewUuids(item: SceneItem): SceneItem {
+    if (item.type === "object") {
+        return {
+            ...item,
+            uuid: newUuid("obj"),
+        };
+    }
+
+    // group
+    const newGroupUuid = newUuid("group");
+
+    const clonedChildren = item.children.map((c) => {
+        if (c.type === "object") {
+            return { ...c, uuid: newUuid("obj") };
         }
-    }
+        // if you ever allow nested groups, recurse:
+        return cloneSceneItemWithNewUuids(c) as any;
+    });
 
-    if (!objectAsset) {
-        console.error(`Asset for ${id} not found!`);
-        return new Three.BoxGeometry(1, 1, 1);
-    }
-
-    // If the asset is a Group (a loaded model), wrap it to center its pivot
-    if (objectAsset instanceof Three.Group) {
-        const wrapperGroup = new Three.Group();
-        const center = new Three.Box3().setFromObject(objectAsset).getCenter(new Three.Vector3());
-        objectAsset.position.sub(center); // Move geometry to center on parent's origin
-        wrapperGroup.add(objectAsset);
-        return wrapperGroup;
-    }
-
-    return objectAsset;
+    return {
+        ...item,
+        uuid: newGroupUuid,
+        children: clonedChildren as any,
+    };
 }
 
 const getMaterialForComponent = (id: MaterialId) => {
-  switch (id) {
-    case "metal":
-      return metalMaterial;
+    switch (id) {
+        case "metal":
+            return metalMaterial;
 
-    case "plastic":
-      return plasticMaterial;
+        case "plastic":
+            return plasticMaterial;
 
-    case "recycled_plastic":
-      return plasticMaterial; // later you can swap to a real recycled texture
+        case "recycled_plastic":
+            return plasticMaterial; // later you can swap to a real recycled texture
 
-    case "wood":
-      return woodMaterial;
+        case "wood":
+            return woodMaterial;
 
-    case "cardboard":
-      return recycledCardboardMaterial; // or newCardboardMaterial if you prefer
+        case "cardboard":
+            return recycledCardboardMaterial; // or newCardboardMaterial if you prefer
 
-    default:
-      return newCardboardMaterial;
-  }
+        default:
+            return newCardboardMaterial;
+    }
 };
 
 
-export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpaceProps>(({ transformMode, lightIntensity, showBlueprint }, ref) => {
+export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpaceProps>(({ transformMode, lightIntensity, showBlueprint, collisionEnabled }, ref) => {
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const sceneRef = useRef<Three.Scene>(null);
@@ -119,6 +153,7 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
     const hemisphereLightRef = useRef<Three.HemisphereLight | null>(null);
     const objectStateRef = useRef<Map<string, { lastSafePos: Three.Vector3 }>>(new Map());
     const blueprintRef = useRef<Three.Group | null>(null);
+    const collisionEnabledRef = useRef(true);
 
     const { sceneItems, selectedItemId, setSelectedItemId, updateItemTransform, glueObjects, deglueObject } = useDesignStore();
 
@@ -288,6 +323,133 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
 
             deglueObject(groupUuid, childrenWorld);
         },
+        duplicateObject: () => {
+            const store = useDesignStore.getState();
+            const { sceneItems, selectedItemId, addObject, addGroup } = store;
+
+            if (!selectedItemId) return;
+
+            const src = sceneItems.find((i) => i.uuid === selectedItemId);
+            if (!src) return;
+
+            // 1) clone with new uuids (supports group + children)
+            const copy = cloneSceneItemWithNewUuids(src);
+
+            // 2) base offset so it’s not exactly on top
+            const baseOffset: [number, number, number] = [2, 0, 2];
+            const p = (copy.position ?? [0, 0, 0]) as [number, number, number];
+            copy.position = [p[0] + baseOffset[0], p[1] + baseOffset[1], p[2] + baseOffset[2]];
+
+            // 3) optional: collision-free placement (your existing logic, but DO NOT mutate 'off.y')
+            const scene = sceneRef.current;
+            if (scene) {
+                const floorY = 0;
+                const padding = 0.15;
+                const step = 2.0;
+                const rings = 25;
+
+                const tempBox = new Three.Box3();
+                const tempOther = new Three.Box3();
+
+                const buildBox = (obj: Three.Object3D, out: Three.Box3) => {
+                    obj.updateWorldMatrix(true, true);
+                    out.setFromObject(obj);
+                    return out;
+                };
+
+                const snapToFloor = (obj: Three.Object3D) => {
+                    buildBox(obj, tempBox);
+                    if (tempBox.min.y < floorY) obj.position.y += (floorY - tempBox.min.y);
+                };
+
+                function* spiralOffsets() {
+                    yield new Three.Vector3(0, 0, 0);
+                    for (let r = 1; r <= rings; r++) {
+                        const min = -r, max = r;
+                        for (let x = min; x <= max; x++) yield new Three.Vector3(x * step, 0, max * step);
+                        for (let z = max - 1; z >= min; z--) yield new Three.Vector3(max * step, 0, z * step);
+                        for (let x = max - 1; x >= min; x--) yield new Three.Vector3(x * step, 0, min * step);
+                        for (let z = min + 1; z <= max - 1; z++) yield new Three.Vector3(min * step, 0, z * step);
+                    }
+                }
+
+                const buildTempThreeObject = (it: SceneItem): Three.Object3D | null => {
+                    if (it.type === "object") {
+                        const model = getCachedModel(it.componentId);
+                        if (!model) return null;
+                        const obj = model.clone(true);
+                        obj.position.fromArray(it.position ?? [0, 0, 0]);
+                        obj.rotation.fromArray((it.rotation ?? [0, 0, 0]) as any);
+                        obj.scale.fromArray(it.scale ?? [1, 1, 1]);
+                        return obj;
+                    }
+
+                    const group = new Three.Group();
+                    group.position.fromArray(it.position ?? [0, 0, 0]);
+                    group.rotation.fromArray((it.rotation ?? [0, 0, 0]) as any);
+                    group.scale.fromArray(it.scale ?? [1, 1, 1]);
+
+                    for (const child of it.children) {
+                        const temp = buildTempThreeObject(child);
+                        if (temp) group.add(temp);
+                    }
+                    return group;
+                };
+
+                const tempObj = buildTempThreeObject(copy);
+                if (tempObj) {
+                    // existing boxes in scene
+                    const existingBoxes: Three.Box3[] = [];
+                    for (const o of objectsRef.current) {
+                        buildBox(o, tempOther);
+                        existingBoxes.push(tempOther.clone().expandByScalar(padding));
+                    }
+
+                    // start from copy.position (important)
+                    tempObj.position.fromArray(copy.position ?? [0, 0, 0]);
+                    snapToFloor(tempObj);
+
+                    buildBox(tempObj, tempBox);
+                    const baseBox = tempBox.clone().expandByScalar(padding);
+                    const basePos = tempObj.position.clone();
+
+                    let chosen = basePos;
+                    for (const off of spiralOffsets()) {
+                        const test = baseBox.clone().translate(off);
+
+                        // do NOT mutate `off.y`; use a local yOff only
+                        if (test.min.y < floorY) {
+                            const yOff = floorY - test.min.y;
+                            test.translate(new Three.Vector3(0, yOff, 0));
+                        }
+
+                        let blocked = false;
+                        for (const b of existingBoxes) {
+                            if (test.intersectsBox(b)) { blocked = true; break; }
+                        }
+                        if (!blocked) {
+                            chosen = basePos.clone().add(off);
+                            // floor snap for chosen
+                            chosen.y += Math.max(0, floorY - test.min.y);
+                            break;
+                        }
+                    }
+
+                    copy.position = [chosen.x, chosen.y, chosen.z];
+                }
+            }
+
+            // 4) commit ONE way
+            if (copy.type === "object") {
+                addObject(copy.componentId, copy.materialId, {
+                    position: copy.position,
+                    rotation: copy.rotation,
+                    scale: copy.scale,
+                });
+            } else {
+                addGroup(copy); // addGroup should also set selectedItemId = copy.uuid
+            }
+        }
     }));
 
     useEffect(() => {
@@ -395,10 +557,21 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
                 const boundingBox = new Three.Box3().setFromObject(object);
                 const floorLevel = 0;
 
+                const minScale = 0.1;
+                const maxScale = 10;
+
+                object.scale.x = Three.MathUtils.clamp(object.scale.x, minScale, maxScale);
+                object.scale.y = Three.MathUtils.clamp(object.scale.y, minScale, maxScale);
+                object.scale.z = Three.MathUtils.clamp(object.scale.z, minScale, maxScale);
+
+                const s = object.scale.x;
+                object.scale.set(s, s, s);
+
                 if (boundingBox.min.y < floorLevel) {
                     const offset = floorLevel - boundingBox.min.y;
                     object.position.y += offset;
                 }
+                if (!collisionEnabledRef.current) return;
                 if (object.name) {
                     const movingBox = new Three.Box3().setFromObject(object);
                     for (const otherMesh of objectsRef.current) {
@@ -482,6 +655,18 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         canvasRef.current.addEventListener('pointerdown', onPointerDown);
         canvasRef.current.addEventListener('pointerup', onPointerUp);
 
+        renderer.toneMappingExposure = 0.8;
+        scene.environmentIntensity = 0.7; // r152+
+
+        setCubeSkybox(scene, renderer, {
+            px: skyboxPx,
+            nx: skyboxNx,
+            py: skyboxPy,
+            ny: skyboxNy,
+            pz: skyboxPz,
+            nz: skyboxNz,
+        });
+
         function animate() {
             requestAnimationFrame(animate);
 
@@ -499,8 +684,13 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
     }, []);
 
     useEffect(() => {
+        const renderer = rendererRef.current;
+        if (!renderer) return;
+        const scene = sceneRef.current;
+        if (!scene) return;
         if (!lightRef.current || !hemisphereLightRef.current) return;
         const t = (lightIntensity - 1) / 99;
+
 
         const minDirectionalIntensity = 0.1;
         const maxDirectionalIntensity = 4.0;
@@ -508,26 +698,125 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         const minHemisphereIntensity = 0.0;
         const maxHemisphereIntensity = 1.5;
 
+        const minExposure = 0.6;
+        const maxExposure = 1.4;
+
         lightRef.current.intensity = Three.MathUtils.lerp(minDirectionalIntensity, maxDirectionalIntensity, t);
         hemisphereLightRef.current.intensity = Three.MathUtils.lerp(minHemisphereIntensity, maxHemisphereIntensity, t);
 
         if (lightHelperRef.current) {
             lightHelperRef.current.update();
         }
+        renderer.toneMappingExposure = Three.MathUtils.lerp(
+            minExposure,
+            maxExposure,
+            t
+        );
+        scene.environmentIntensity = Three.MathUtils.lerp(0.3, 1.2, t);
     }, [lightIntensity])
 
     useEffect(() => {
         const scene = sceneRef.current;
         const transformControls = transformControlsRef.current;
         const outlinePass = outlinePassRef.current;
+        const camera = cameraRef.current;
 
-        if (!scene || !transformControls || !outlinePass) return;
+        if (!scene || !transformControls || !outlinePass || !camera) return;
 
-        objectsRef.current.forEach(obj => {
-            scene.remove(obj);
-        });
+        // Clear old objects
+        objectsRef.current.forEach(obj => scene.remove(obj));
         objectsRef.current = [];
         objectStateRef.current.clear();
+
+        const floorY = 0;
+        const padding = 0.15;     // spacing between objects
+        const step = 2.0;         // search step in XZ
+        const rings = 25;         // how far to search
+
+        const tempBox = new Three.Box3();
+        const tempOtherBox = new Three.Box3();
+
+        function buildWorldBox(obj: Three.Object3D, out: Three.Box3) {
+            obj.updateWorldMatrix(true, true);
+            out.setFromObject(obj);
+            return out;
+        }
+
+        function snapToFloor(obj: Three.Object3D) {
+            buildWorldBox(obj, tempBox);
+            if (tempBox.min.y < floorY) {
+                obj.position.y += (floorY - tempBox.min.y);
+            }
+        }
+
+        function isBlocked(testBox: Three.Box3, existingBoxes: Three.Box3[]) {
+            for (const b of existingBoxes) {
+                if (testBox.intersectsBox(b)) return true;
+            }
+            return false;
+        }
+
+        // generate a simple square spiral offsets list (0, then ring by ring)
+        function* spiralOffsets() {
+            yield new Three.Vector3(0, 0, 0);
+
+            for (let r = 1; r <= rings; r++) {
+                const min = -r, max = r;
+
+                for (let x = min; x <= max; x++) yield new Three.Vector3(x * step, 0, max * step);
+                for (let z = max - 1; z >= min; z--) yield new Three.Vector3(max * step, 0, z * step);
+                for (let x = max - 1; x >= min; x--) yield new Three.Vector3(x * step, 0, min * step);
+                for (let z = min + 1; z <= max - 1; z++) yield new Three.Vector3(min * step, 0, z * step);
+            }
+        }
+
+        // While we rebuild, keep boxes of already-added objects so new ones can avoid them
+        const placedBoxes: Three.Box3[] = [];
+
+        // optional: a decent default desired spawn position (in front of camera)
+        function getRaycastDesiredPos(): {
+            point: Three.Vector3;
+            normal: Three.Vector3;
+        } {
+            const raycaster = new Three.Raycaster();
+
+            if (!camera) {
+                return {
+                    point: new Three.Vector3(0, 0, 0),
+                    normal: new Three.Vector3(0, 1, 0),
+                };
+            }
+
+            // cast from camera center
+            raycaster.setFromCamera(new Three.Vector2(0, 0), camera);
+
+            // raycast against existing objects
+            const hits = raycaster.intersectObjects(objectsRef.current, true);
+
+            if (hits.length > 0) {
+                const hit = hits[0];
+
+                const normal = hit.face
+                    ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld)
+                    : new Three.Vector3(0, 1, 0);
+
+                return {
+                    point: hit.point.clone(),
+                    normal,
+                };
+            }
+
+            // fallback: infinite floor plane
+            const plane = new Three.Plane(new Three.Vector3(0, 1, 0), -floorY);
+            const point = new Three.Vector3();
+            raycaster.ray.intersectPlane(plane, point);
+
+            return {
+                point,
+                normal: new Three.Vector3(0, 1, 0),
+            };
+        }
+
 
         sceneItems.forEach((item) => {
             let newObject: Three.Object3D | null = null;
@@ -549,13 +838,11 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
                     const childObj = model.clone(true);
                     childObj.name = child.uuid;
 
-                    // apply material
                     const mat = getMaterialForComponent(child.materialId);
                     childObj.traverse((m) => {
                         if (m instanceof Three.Mesh) m.material = mat;
                     });
 
-                    // local-to-group transforms
                     if (child.position) childObj.position.fromArray(child.position);
                     if (child.rotation) childObj.rotation.fromArray(child.rotation as any);
                     if (child.scale) childObj.scale.fromArray(child.scale);
@@ -585,19 +872,74 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
                 newObject = obj;
             }
 
-            if (newObject) {
-                scene.add(newObject);
-                objectsRef.current.push(newObject);
-                objectStateRef.current.set(newObject.name, {
-                    lastSafePos: newObject.position.clone(),
-                });
+            if (!newObject) return;
+            const isNew = !item.position;
+
+            if (isNew) {
+                const { point, normal } = getRaycastDesiredPos();
+
+                // offset along surface normal so we don’t spawn inside geometry
+                const surfaceOffset = 0.5;
+                newObject.position.copy(
+                    point.clone().add(normal.normalize().multiplyScalar(surfaceOffset))
+                );
+
+                snapToFloor(newObject);
+
+                // 2) build base box (expanded for spacing)
+                buildWorldBox(newObject, tempBox);
+                const baseBox = tempBox.clone().expandByScalar(padding);
+
+                // 3) search nearby positions until no intersection
+                const basePos = newObject.position.clone();
+                let chosenPos = basePos;
+
+                for (const off of spiralOffsets()) {
+                    const testBox = baseBox.clone();
+                    testBox.translate(off);
+
+                    // ensure not below floor
+                    if (testBox.min.y < floorY) {
+                        const yOff = floorY - testBox.min.y;
+                        testBox.translate(new Three.Vector3(0, yOff, 0));
+                        off.y += yOff;
+                    }
+
+                    if (!isBlocked(testBox, placedBoxes)) {
+                        chosenPos = basePos.clone().add(off);
+                        break;
+                    }
+                }
+
+                newObject.position.copy(chosenPos);
+
+                // 4) final snap (safe)
+                snapToFloor(newObject);
+
+                // 5) persist into store so it won't re-spawn differently next render
+                updateItemTransform(
+                    item.uuid,
+                    newObject.position.toArray() as [number, number, number],
+                    newObject.rotation.toArray().slice(0, 3) as [number, number, number],
+                    newObject.scale.toArray() as [number, number, number]
+                );
+            } else {
+                // Existing objects: just ensure they aren't under floor
+                snapToFloor(newObject);
             }
+
+            // Add to scene and tracking
+            scene.add(newObject);
+            objectsRef.current.push(newObject);
+            objectStateRef.current.set(newObject.name, { lastSafePos: newObject.position.clone() });
+
+            // Update placedBoxes for subsequent spawns
+            buildWorldBox(newObject, tempOtherBox);
+            placedBoxes.push(tempOtherBox.clone().expandByScalar(padding));
         });
 
-
-        // 3. Update selection based on the store. 
+        // selection
         const selectedObjectInScene = objectsRef.current.find(obj => obj.name === selectedItemId);
-
         if (selectedObjectInScene) {
             transformControls.attach(selectedObjectInScene);
             outlinePass.selectedObjects = [selectedObjectInScene];
@@ -612,8 +954,13 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
 
     useEffect(() => {
         const transformControls = transformControlsRef.current;
-        if (transformControls) {
-            transformControls.setMode(transformMode)
+        if (!transformControls) return;
+
+        transformControls.setMode(transformMode)
+        if (transformMode === "scale") {
+            transformControls.setSize(0.5);   // slower scale
+        } else {
+            transformControls.setSize(1.0);   // normal move/rotate
         }
     }, [transformMode])
 
@@ -651,6 +998,10 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
             blueprintRef.current.visible = showBlueprint;
         }
     }, [showBlueprint]);
+
+    useEffect(() => {
+        collisionEnabledRef.current = collisionEnabled;
+    }, [collisionEnabled]);
 
     return (
         <div>

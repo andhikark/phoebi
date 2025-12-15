@@ -18,9 +18,35 @@ const defaultDesign: DesignState = {
   bicycle_wheel: { materialId: "plastic" },
   seat: { materialId: "cardboard" },
   handlebar: { materialId: "wood" },
-  lego: {materialId: 'plastic'},
-  battery: {materialId: 'recycled_aluminium'},
-  car_wheel: {materialId: 'plastic'}
+  lego: { materialId: "plastic" },
+  car_wheel: { materialId: "plastic" },
+
+  // primitives — sensible defaults
+  box: { materialId: "cardboard" },
+  sphere: { materialId: "plastic" },
+  cylinder: { materialId: "plastic" },
+  cone: { materialId: "plastic" },
+  capsule: { materialId: "plastic" },
+  torus: { materialId: "plastic" },
+  torusKnot: { materialId: "plastic" },
+  circle: { materialId: "cardboard" },
+  ring: { materialId: "plastic" },
+  plane: { materialId: "cardboard" },
+
+  // polyhedra
+  tetrahedron: { materialId: "plastic" },
+  octahedron: { materialId: "plastic" },
+  dodecahedron: { materialId: "plastic" },
+  icosahedron: { materialId: "plastic" },
+
+  // advanced procedural
+  tube: { materialId: "plastic" },
+  lathe: { materialId: "plastic" },
+  extrude: { materialId: "plastic" },
+  shape: { materialId: "cardboard" },
+  polyhedron: { materialId: "plastic" },
+  edges: { materialId: "metal" },
+  battery: {materialId: 'recycled_aluminium'}
 };
 
 interface DesignContextValue {
