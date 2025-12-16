@@ -34,7 +34,7 @@ interface DesignState {
       scale?: [number, number, number];
     }) => void;
   addGroup: (group: SceneGroup) => void;
-  setSelectedItemId: (uuid: string) => void;
+  setSelectedItemId: (uuid: string | null) => void;
   deleteSelectedItem: () => void;
   setMaterialForSelected: (materialId: MaterialId) => void;
   glueObjects: (groupData: SceneGroup, originalUuids: [string, string]) => void;

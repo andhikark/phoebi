@@ -154,6 +154,9 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
     const objectStateRef = useRef<Map<string, { lastSafePos: Three.Vector3 }>>(new Map());
     const blueprintRef = useRef<Three.Group | null>(null);
     const collisionEnabledRef = useRef(true);
+    const tempSelectedRef = useRef<Set<string>>(new Set());
+    const tempGroupRef = useRef<Three.Group | null>(null);
+
 
     const { sceneItems, selectedItemId, setSelectedItemId, updateItemTransform, glueObjects, deglueObject } = useDesignStore();
 
@@ -452,6 +455,65 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         }
     }));
 
+    function rebuildTempGroup() {
+        const scene = sceneRef.current!;
+        const transformControls = transformControlsRef.current!;
+        const outlinePass = outlinePassRef.current!;
+
+        // remove old temp group
+        if (tempGroupRef.current) {
+            scene.remove(tempGroupRef.current);
+            tempGroupRef.current = null;
+        }
+
+        const uuids = [...tempSelectedRef.current];
+        if (uuids.length === 0) {
+            transformControls.detach();
+            outlinePass.selectedObjects = [];
+            return;
+        }
+
+        // highlight selected roots
+        const selectedRoots: Three.Object3D[] = [];
+        for (const id of uuids) {
+            const obj = scene.getObjectByName(id);
+            if (obj) selectedRoots.push(obj);
+        }
+        outlinePass.selectedObjects = selectedRoots;
+
+        // if only 1, attach normally
+        if (selectedRoots.length === 1) {
+            transformControls.attach(selectedRoots[0]);
+            return;
+        }
+
+        // build pivot group at bbox center (world)
+        const box = new Three.Box3();
+        for (const o of selectedRoots) {
+            o.updateWorldMatrix(true, true);
+            box.union(new Three.Box3().setFromObject(o));
+        }
+        const center = box.getCenter(new Three.Vector3());
+
+        const pivot = new Three.Group();
+        pivot.name = "__tempGroup__";
+        pivot.position.copy(center);
+
+        // IMPORTANT: add pivot to scene and then parent selected objects under it
+        scene.add(pivot);
+
+        // Convert each selected root from world -> pivot local by reparenting
+        for (const o of selectedRoots) {
+            // preserve world transform when reparenting
+            // if not, use attach() built-in:
+            pivot.attach(o); // three r152+ keeps world transform
+        }
+
+        tempGroupRef.current = pivot;
+        transformControls.attach(pivot);
+    }
+
+
     useEffect(() => {
         if (!canvasRef.current) {
             return;
@@ -553,66 +615,68 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         });
         transformControls.addEventListener('objectChange', () => {
             const object = transformControls.object;
-            if (object) {
-                const boundingBox = new Three.Box3().setFromObject(object);
-                const floorLevel = 0;
+            if (!object) return;
 
-                const minScale = 0.1;
-                const maxScale = 10;
+            const floorLevel = 0;
+            const minScale = 0.1;
+            const maxScale = 10;
 
-                object.scale.x = Three.MathUtils.clamp(object.scale.x, minScale, maxScale);
-                object.scale.y = Three.MathUtils.clamp(object.scale.y, minScale, maxScale);
-                object.scale.z = Three.MathUtils.clamp(object.scale.z, minScale, maxScale);
+            object.scale.x = Three.MathUtils.clamp(object.scale.x, minScale, maxScale);
+            object.scale.y = Three.MathUtils.clamp(object.scale.y, minScale, maxScale);
+            object.scale.z = Three.MathUtils.clamp(object.scale.z, minScale, maxScale);
 
-                const s = object.scale.x;
-                object.scale.set(s, s, s);
+            // if (mode === "scale") {
+            //     const s = (object.scale.x + object.scale.y + object.scale.z) / 3;
+            //     object.scale.set(s, s, s);
+            // }
 
-                if (boundingBox.min.y < floorLevel) {
-                    const offset = floorLevel - boundingBox.min.y;
-                    object.position.y += offset;
-                }
-                if (!collisionEnabledRef.current) return;
-                if (object.name) {
-                    const movingBox = new Three.Box3().setFromObject(object);
-                    for (const otherMesh of objectsRef.current) {
-                        if (otherMesh === object) continue;
+            const boundingBox = new Three.Box3().setFromObject(object);
+            if (boundingBox.min.y < floorLevel) {
+                object.position.y += (floorLevel - boundingBox.min.y);
+            }
 
-                        const otherBox = new Three.Box3().setFromObject(otherMesh);
-                        if (movingBox.intersectsBox(otherBox)) {
+            if (!collisionEnabledRef.current) return;
+            if (object.name) {
+                const movingBox = new Three.Box3().setFromObject(object);
+                for (const otherMesh of objectsRef.current) {
+                    if (otherMesh === object) continue;
 
-                            // Calculate the vector from the other object to the moving one
-                            const movingCenter = new Three.Vector3();
-                            movingBox.getCenter(movingCenter);
-                            const otherCenter = new Three.Vector3();
-                            otherBox.getCenter(otherCenter);
+                    const otherBox = new Three.Box3().setFromObject(otherMesh);
+                    if (movingBox.intersectsBox(otherBox)) {
 
-                            // Calculate overlap on each axis
-                            const overlap = new Three.Vector3();
-                            overlap.x = Math.min(movingBox.max.x, otherBox.max.x) - Math.max(movingBox.min.x, otherBox.min.x);
-                            overlap.y = Math.min(movingBox.max.y, otherBox.max.y) - Math.max(movingBox.min.y, otherBox.min.y);
-                            overlap.z = Math.min(movingBox.max.z, otherBox.max.z) - Math.max(movingBox.min.z, otherBox.min.z);
+                        // Calculate the vector from the other object to the moving one
+                        const movingCenter = new Three.Vector3();
+                        movingBox.getCenter(movingCenter);
+                        const otherCenter = new Three.Vector3();
+                        otherBox.getCenter(otherCenter);
 
-                            // Find the axis with the minimum overlap (this is the axis to push out on)
-                            if (overlap.x < overlap.y && overlap.x < overlap.z) {
-                                const sign = Math.sign(movingCenter.x - otherCenter.x);
-                                object.position.x += (overlap.x * sign);
-                            } else if (overlap.y < overlap.z) {
-                                const sign = Math.sign(movingCenter.y - otherCenter.y);
-                                object.position.y += (overlap.y * sign);
-                            } else {
-                                const sign = Math.sign(movingCenter.z - otherCenter.z);
-                                object.position.z += (overlap.z * sign);
-                            }
+                        // Calculate overlap on each axis
+                        const overlap = new Three.Vector3();
+                        overlap.x = Math.min(movingBox.max.x, otherBox.max.x) - Math.max(movingBox.min.x, otherBox.min.x);
+                        overlap.y = Math.min(movingBox.max.y, otherBox.max.y) - Math.max(movingBox.min.y, otherBox.min.y);
+                        overlap.z = Math.min(movingBox.max.z, otherBox.max.z) - Math.max(movingBox.min.z, otherBox.min.z);
+
+                        // Find the axis with the minimum overlap (this is the axis to push out on)
+                        if (overlap.x < overlap.y && overlap.x < overlap.z) {
+                            const sign = Math.sign(movingCenter.x - otherCenter.x);
+                            object.position.x += (overlap.x * sign);
+                        } else if (overlap.y < overlap.z) {
+                            const sign = Math.sign(movingCenter.y - otherCenter.y);
+                            object.position.y += (overlap.y * sign);
+                        } else {
+                            const sign = Math.sign(movingCenter.z - otherCenter.z);
+                            object.position.z += (overlap.z * sign);
                         }
                     }
+                }
 
-                    const state = objectStateRef.current.get(object.name);
-                    if (state) {
-                        // Always update the safe position after resolution
-                        state.lastSafePos.copy(object.position);
-                    }
+                const state = objectStateRef.current.get(object.name);
+                if (state) {
+                    // Always update the safe position after resolution
+                    state.lastSafePos.copy(object.position);
                 }
             }
+
         });
         scene.add(transformControls.getHelper());
         transformControlsRef.current = transformControls;

@@ -3,7 +3,8 @@ import { installKeyboardInput } from "../logic/keyboardinput";
 
 export function InputBootstrap() {
   useEffect(() => {
-    installKeyboardInput();
+    const cleanup = installKeyboardInput();
+    return cleanup;
   }, []);
 
   return null;
