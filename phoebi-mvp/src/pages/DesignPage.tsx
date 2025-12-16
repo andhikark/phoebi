@@ -128,13 +128,29 @@ export const DesignPage: React.FC = () => {
   // -----------------------------
   useEffect(() => {
     const unsubscribe = inputDispatcher.subscribe((action) => {
+      const store = useDesignStore.getState();
+      const id = store.selectedItemId;          
+      const api = learningSpaceRef.current;
+
       switch (action.type) {
         case "DELETE":
-          handleDeleteClick();
+          api?.deleteSelectedObject();
+          store.deleteSelectedItem();
           break;
-        case "GLUE":
-          handleGlueClick();
+
+        case "GLUE": {
+          if (!id || !api) return;
+          const other = api.findTouchingObjectUuid(id);
+          if (other) api.glueObjects(id, other);
           break;
+        }
+
+        case "DEGLUE": {
+          if (!id || !api) return;
+          const item = store.sceneItems.find(i => i.uuid === id);
+          if (item?.type === "group") api.deglueObject(id);
+          break;
+
         case "DEGLUE":
           handleEraseClick();
           break;
@@ -147,6 +163,7 @@ export const DesignPage: React.FC = () => {
         case "MODE_SCALE":
           setTrasformMode("scale");
           break;
+
         case "DUPLICATE":
           handleDuplicate();
           break;

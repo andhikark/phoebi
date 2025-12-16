@@ -36,13 +36,15 @@ export function preloadModels(): Promise<void[]> {
             gltfLoader.load(
                 url,
                 (gltf) => {
-                    const model = gltf.scene;
+                    const pivot = new Three.Group();
+                    pivot.add(gltf.scene);
 
-                    normalizeModelScale(model, normalize_value);
+                    normalizeModelScale(gltf.scene, normalize_value);
 
-                    modelCache.set(id, model);
+                    modelCache.set(id, pivot);
 
-                    model.traverse((child) => {
+                    // traverse meshes from pivot
+                    pivot.traverse((child) => {
                         if (child instanceof Three.Mesh) {
                             const geometryId = `${id}_${child.uuid}`;
                             geometryCache.set(geometryId, child.geometry);
@@ -79,8 +81,10 @@ export function getCachedModel(id: ComponentId): Three.Group | undefined {
 }
 
 
-function normalizeModelScale(object: Three.Object3D, targetSize = 1) {
-    const box = new Three.Box3().setFromObject(object);
+function normalizeModelScale(model: Three.Object3D, targetSize = 1) {
+    model.updateWorldMatrix(true, true);
+
+    const box = new Three.Box3().setFromObject(model);
     const size = new Three.Vector3();
     box.getSize(size);
 
@@ -88,12 +92,17 @@ function normalizeModelScale(object: Three.Object3D, targetSize = 1) {
     if (maxDim <= 0) return;
 
     const scale = targetSize / maxDim;
-    object.scale.setScalar(scale);
+    model.scale.setScalar(scale);
 
-    // center pivot at origin after scaling
+    // Recompute AFTER scaling
+    model.updateWorldMatrix(true, true);
+    const box2 = new Three.Box3().setFromObject(model);
     const center = new Three.Vector3();
-    box.getCenter(center);
-    object.position.sub(center.multiplyScalar(scale));
+    box2.getCenter(center);
+
+    // Move geometry to pivot origin
+    model.position.sub(center);
+    model.updateWorldMatrix(true, true);
 }
 
 function createPrimitive(id: ComponentId, targetSize = 1): Three.Group | undefined {
