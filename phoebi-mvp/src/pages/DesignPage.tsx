@@ -523,9 +523,9 @@ export const DesignPage: React.FC = () => {
                   <div className="p-4 rounded-lg bg-white shadow-xl w-48">
                     <h3 className="text-sm font-bold mb-2">Objectives</h3>
                     <ul className="text-sm space-y-1">
-                      <li className="text-green-600">0/4 Wheels</li>
-                      <li className="text-yellow-600">0/2 Doors</li>
-                      <li className="text-red-600">0/2 Windows</li>
+                      <li className="text-green-600">0/2 Wheels</li>
+                      <li className="text-yellow-600">0/1 Body</li>
+                      <li className="text-red-600">0/1 Seat </li>
                     </ul>
                   </div>
 
