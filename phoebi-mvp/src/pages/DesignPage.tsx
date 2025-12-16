@@ -165,10 +165,6 @@ export const DesignPage: React.FC = () => {
         case "MODE_SCALE":
           setTrasformMode("scale");
           break;
-
-        case "DUPLICATE":
-          handleDuplicate();
-          break;
       }
     });
 
