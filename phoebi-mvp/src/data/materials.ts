@@ -1,7 +1,6 @@
 import type { Material } from "../types/domain";
 import woodDiffUrl from '../assets/textures/wood/oak_veneer_01_diff_4k.jpg';
 import woodAoUrl from '../assets/textures/wood/oak_veneer_01_ao_4k.jpg';
-import woodDispUrl from '../assets/textures/wood/oak_veneer_01_disp_4k.png';
 import woodRoughUrl from '../assets/textures/wood/oak_veneer_01_arm_4k.jpg';
 
 import bambooColorUrl from '../assets/textures/bamboo/fabric_0024_color_2k.jpg';
@@ -17,7 +16,6 @@ import oldMetalUrl from '../assets/textures/metal/old_metal.jpg';
 
 import plasticColorUrl from '../assets/textures/plastic/plastic_0018_color_2k.jpg';
 import plasticAoUrl from '../assets/textures/plastic/plastic_0018_ao_2k.jpg';
-import plasticHeightUrl from '../assets/textures/plastic/plastic_0018_height_2k.png';
 import plasticNormalUrl from '../assets/textures/plastic/plastic_0018_normal_opengl_2k.png';
 import plasticRoughnessUrl from '../assets/textures/plastic/plastic_0018_roughness_2k.jpg';
 
@@ -33,7 +31,6 @@ const textureLoader = new Three.TextureLoader();
 
 const woodColorMap = textureLoader.load(woodDiffUrl);
 const woodAoMap = textureLoader.load(woodAoUrl);
-const woodDisplacementMap = textureLoader.load(woodDispUrl);
 const woodRoughnessMap = textureLoader.load(woodRoughUrl);
 
 export const woodMaterial = new Three.MeshStandardMaterial({
@@ -85,7 +82,6 @@ export const recycledCardboardMaterial = new Three.MeshStandardMaterial({
 
 const plasticColorMap = textureLoader.load(plasticColorUrl);
 const plasticAoMap = textureLoader.load(plasticAoUrl);
-const plasticDisplacementMap = textureLoader.load(plasticHeightUrl);
 const plasticNormalMap = textureLoader.load(plasticNormalUrl);
 const plasticRoughnessMap = textureLoader.load(plasticRoughnessUrl);
 

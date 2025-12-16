@@ -154,8 +154,6 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
     const objectStateRef = useRef<Map<string, { lastSafePos: Three.Vector3 }>>(new Map());
     const blueprintRef = useRef<Three.Group | null>(null);
     const collisionEnabledRef = useRef(true);
-    const tempSelectedRef = useRef<Set<string>>(new Set());
-    const tempGroupRef = useRef<Three.Group | null>(null);
 
 
     const { sceneItems, selectedItemId, setSelectedItemId, updateItemTransform, glueObjects, deglueObject } = useDesignStore();
@@ -455,63 +453,6 @@ export const LearningSpace = React.forwardRef<LearningSpaceHandle, LearningSpace
         }
     }));
 
-    function rebuildTempGroup() {
-        const scene = sceneRef.current!;
-        const transformControls = transformControlsRef.current!;
-        const outlinePass = outlinePassRef.current!;
-
-        // remove old temp group
-        if (tempGroupRef.current) {
-            scene.remove(tempGroupRef.current);
-            tempGroupRef.current = null;
-        }
-
-        const uuids = [...tempSelectedRef.current];
-        if (uuids.length === 0) {
-            transformControls.detach();
-            outlinePass.selectedObjects = [];
-            return;
-        }
-
-        // highlight selected roots
-        const selectedRoots: Three.Object3D[] = [];
-        for (const id of uuids) {
-            const obj = scene.getObjectByName(id);
-            if (obj) selectedRoots.push(obj);
-        }
-        outlinePass.selectedObjects = selectedRoots;
-
-        // if only 1, attach normally
-        if (selectedRoots.length === 1) {
-            transformControls.attach(selectedRoots[0]);
-            return;
-        }
-
-        // build pivot group at bbox center (world)
-        const box = new Three.Box3();
-        for (const o of selectedRoots) {
-            o.updateWorldMatrix(true, true);
-            box.union(new Three.Box3().setFromObject(o));
-        }
-        const center = box.getCenter(new Three.Vector3());
-
-        const pivot = new Three.Group();
-        pivot.name = "__tempGroup__";
-        pivot.position.copy(center);
-
-        // IMPORTANT: add pivot to scene and then parent selected objects under it
-        scene.add(pivot);
-
-        // Convert each selected root from world -> pivot local by reparenting
-        for (const o of selectedRoots) {
-            // preserve world transform when reparenting
-            // if not, use attach() built-in:
-            pivot.attach(o); // three r152+ keeps world transform
-        }
-
-        tempGroupRef.current = pivot;
-        transformControls.attach(pivot);
-    }
 
 
     useEffect(() => {

@@ -6,7 +6,7 @@ interface RangeSliderInterface {
 
 const RangeSlider: React.FC<RangeSliderInterface> = ({onChange}) => {
 
-    const [slider, setSlider] = useState({
+    const [slider] = useState({
         max: 100, 
         min: 0, 
         value: 0, 
