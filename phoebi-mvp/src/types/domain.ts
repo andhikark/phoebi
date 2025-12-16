@@ -91,8 +91,18 @@ export interface ScorePerComponent {
 
 export interface ScoreResult {
   totalCo2: number;
-  overallScore: number; // 0–100
+
+  // 0–10 breakdown (matches your UI)
+  sustainabilityScore: number;
+  recyclabilityScore: number;
+  durabilityScore: number;
+
+  // 0–100 combined score
+  finalScore: number;
+
   perComponent: ScorePerComponent[];
 }
+
+
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';

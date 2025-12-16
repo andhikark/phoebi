@@ -42,7 +42,7 @@ export const SummaryPage: React.FC = () => {
         <section className="mb-6 rounded-3xl bg-white shadow-md px-6 py-5">
           <p className="text-sm text-gray-600">Overall score</p>
           <p className="text-4xl font-extrabold text-[#4CBC93]">
-            {score.overallScore.toFixed(1)}
+            {score.finalScore.toFixed(1)}
             <span className="text-lg text-gray-400"> / 100</span>
           </p>
           <p className="text-sm text-gray-600 mt-2">
