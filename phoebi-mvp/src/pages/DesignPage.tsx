@@ -150,9 +150,11 @@ export const DesignPage: React.FC = () => {
           const item = store.sceneItems.find(i => i.uuid === id);
           if (item?.type === "group") api.deglueObject(id);
           break;
+        }
 
-        case "DEGLUE":
-          handleEraseClick();
+        case "DUPLICATE":
+          if (!id || !api) return;
+          api.duplicateObject();
           break;
         case "MODE_TRANSLATE":
           setTrasformMode("translate");
